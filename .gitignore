@@ -1,0 +1,17 @@
+node_modules/
+dist/
+data/
+.env
+.env.*
+!.env.example
+_historial-claude/
+.claude/
+.impeccable/
+coverage/
+playwright-report/
+.playwright-cli/
+test-results/
+*.db
+*.db-shm
+*.db-wal
+*.log

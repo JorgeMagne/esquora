@@ -1,0 +1,16 @@
+.git/
+.env
+.env.*
+data/
+node_modules/
+dist/
+_historial-claude/
+.claude/
+.impeccable/
+coverage/
+playwright-report/
+.playwright-cli/
+test-results/
+*.db
+*.db-*
+*.log

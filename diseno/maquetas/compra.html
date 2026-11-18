@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="es-BO">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ESQUORA · Mi compra</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sofia+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --papel: #F4F5F2;
+  --tinta: #10151C;
+  --tinta-2: #5A6470;
+  --linea: #D9DDE0;
+  --azul: #2038D0;
+  --azul-fondo: #E6E9FB;
+  --lado: 20px;
+}
+* { box-sizing: border-box; margin: 0; }
+html { background: #E9EBE7; }
+body {
+  max-width: 420px; min-height: 100dvh; margin: 0 auto;
+  background: var(--papel); color: var(--tinta);
+  font: 400 16px/1.4 "Sofia Sans", system-ui, sans-serif;
+  font-variant-numeric: tabular-nums lining-nums;
+  -webkit-font-smoothing: antialiased;
+  padding-bottom: calc(148px + env(safe-area-inset-bottom));
+}
+::selection { background: var(--azul); color: #fff; }
+a { color: inherit; }
+:focus-visible { outline: 2px solid var(--azul); outline-offset: 3px; }
+
+.barra { display: flex; align-items: center; gap: 12px; height: 56px; padding: 0 var(--lado); }
+.marca { display: flex; align-items: center; gap: 9px; font-size: 13px; font-weight: 700; letter-spacing: .18em; text-decoration: none; }
+.marca svg { width: 15px; height: 15px; }
+.pruebas { margin-left: auto; font-size: 12px; color: var(--tinta-2); }
+.yo { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--tinta); background: none; color: var(--tinta); font: 600 12px "Sofia Sans"; letter-spacing: .02em; }
+
+.obra { display: grid; grid-template-columns: 1fr 116px; column-gap: 12px; padding: 12px var(--lado) 0; }
+h1 { font-size: 40px; line-height: 1; font-weight: 700; letter-spacing: -.025em; }
+.que { margin-top: 8px; font-size: 15px; font-weight: 500; }
+.donde { font-size: 14px; color: var(--tinta-2); }
+.texto { display: flex; flex-direction: column; }
+.dinero { margin-top: auto; padding-bottom: 16px; }
+.dinero strong { display: block; font-size: 54px; line-height: .95; font-weight: 700; letter-spacing: -.03em; }
+.dinero strong small { font-size: 16px; font-weight: 600; letter-spacing: .02em; margin-right: 6px; }
+.dinero b { display: block; margin-top: 6px; font-size: 16px; font-weight: 600; }
+.dinero p { font-size: 14px; color: var(--tinta-2); }
+.torre { width: 116px; height: 230px; display: block; }
+.torre .contorno { stroke-dasharray: 500; animation: trazo .9s cubic-bezier(.16,1,.3,1) both; }
+.torre .unidad { transform-origin: 55.5px 170.5px; animation: unidad .5s .55s cubic-bezier(.16,1,.3,1) both; }
+@keyframes trazo { from { stroke-dashoffset: 500; } to { stroke-dashoffset: 0; } }
+@keyframes unidad { from { transform: scale(.2); opacity: 0; } to { transform: none; opacity: 1; } }
+
+.base { display: flex; gap: 2px; height: 12px; margin: 0 var(--lado); }
+.base i { display: block; flex: 1; }
+.entregado { background: var(--tinta); }
+.protegido { background: var(--azul); }
+
+.tramos { list-style: none; padding: 4px var(--lado) 0; }
+.tramos a { display: grid; grid-template-columns: 10px 1fr auto; column-gap: 12px; align-items: start; padding: 14px 0; text-decoration: none; border-bottom: 1px solid var(--linea); }
+.tramos i { width: 10px; height: 10px; margin-top: 6px; }
+.tramos b { display: block; font-size: 16px; font-weight: 600; }
+.tramos small { display: block; font-size: 13px; color: var(--tinta-2); }
+.tramos span { font-size: 15px; font-weight: 600; }
+.tramos a:active { background: var(--azul-fondo); }
+
+.registro { display: inline-flex; align-items: center; gap: 6px; margin: 16px var(--lado) 0; font-size: 14px; color: var(--tinta-2); text-underline-offset: 3px; }
+.registro svg { width: 14px; height: 14px; }
+
+.pie { position: fixed; left: 50%; bottom: 0; width: 100%; max-width: 420px; transform: translateX(-50%); background: var(--papel); padding-bottom: env(safe-area-inset-bottom); }
+.accion { display: flex; align-items: center; justify-content: space-between; height: 54px; margin: 12px var(--lado); padding: 0 18px 0 20px; border: 0; width: calc(100% - 2 * var(--lado)); background: var(--azul); color: #fff; font: 600 17px "Sofia Sans"; text-align: left; cursor: pointer; transition: background .15s; }
+.accion:hover { background: #1930B8; }
+.accion:active { background: #14279C; }
+.accion svg { width: 20px; height: 20px; }
+nav { display: grid; grid-template-columns: repeat(3, 1fr); height: 58px; border-top: 1px solid var(--linea); }
+nav a { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 12px; font-weight: 500; color: var(--tinta-2); text-decoration: none; }
+nav a[aria-current] { color: var(--tinta); font-weight: 700; }
+nav svg { width: 22px; height: 22px; }
+.linea { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: square; }
+
+@media (prefers-reduced-motion: reduce) { .torre .contorno, .torre .unidad { animation: none; } }
+</style>
+</head>
+<body>
+
+<header class="barra">
+  <a class="marca" href="#" aria-label="ESQUORA, inicio">
+    <svg viewBox="0 0 15 15" aria-hidden="true"><path d="M.5.5h14v14H.5zM7.5.5v14M.5 7.5h14" fill="none" stroke="#10151C"/><path d="M1 8h6v6H1z" fill="#2038D0"/></svg>
+    ESQUORA
+  </a>
+  <span class="pruebas">Entorno de pruebas</span>
+  <button class="yo" aria-label="Tu cuenta, Mariana Rojas">MR</button>
+</header>
+
+<main>
+  <section class="obra">
+    <div class="texto">
+      <h1>A-302</h1>
+      <p class="que">Departamento, piso 3</p>
+      <p class="donde">Edificio Curupaú</p>
+      <div class="dinero">
+        <strong><small>USD</small>6.000</strong>
+        <b>protegidos</b>
+        <p>de 12.000 de cuota inicial</p>
+      </div>
+    </div>
+
+    <svg class="torre" viewBox="0 0 116 230" role="img" aria-label="Corte del edificio, todavía en proyecto, con tu departamento marcado en el piso 3">
+      <g fill="none" stroke="#10151C" stroke-width=".6" stroke-dasharray="2 2.5" opacity=".42">
+        <path d="M30 213h68M30 196h68M30 179h68M30 162h68M30 145h68M30 128h68M30 111h68M30 94h68M30 77h68M30 60h68M30 43h68"/>
+        <path d="M47 26v204M64 26v204M81 26v204"/>
+      </g>
+      <path class="contorno" d="M30 230V26h22V14h24v12h22v204" fill="none" stroke="#10151C" stroke-width="1.25"/>
+      <rect class="unidad" x="47" y="162" width="17" height="17" fill="#2038D0"/>
+      <path d="M20 170.5h8" stroke="#2038D0" stroke-width="1.25"/>
+      <text x="16" y="174.5" text-anchor="end" font-family="Sofia Sans, sans-serif" font-size="11" font-weight="700" fill="#2038D0">3</text>
+    </svg>
+  </section>
+
+  <div class="base" role="img" aria-label="La cuota inicial en dos tramos: el primero entregado, el segundo protegido">
+    <i class="entregado"></i><i class="protegido"></i>
+  </div>
+
+  <ul class="tramos">
+    <li><a href="#">
+      <i class="entregado"></i>
+      <div><b>Documentación</b><small>Entregado el 12 nov</small></div>
+      <span>USD 6.000</span>
+    </a></li>
+    <li><a href="#">
+      <i class="protegido"></i>
+      <div><b>Inicio de obra</b><small>En revisión · vence el 15 dic</small></div>
+      <span>USD 6.000</span>
+    </a></li>
+  </ul>
+
+  <a class="registro" href="#">
+    Comprobar en el registro público
+    <svg viewBox="0 0 14 14" aria-hidden="true"><path class="linea" d="M5 2.5h6.5V9M11.5 2.5l-9 9" stroke-width="1.25"/></svg>
+  </a>
+</main>
+
+<div class="pie">
+  <button class="accion">
+    Revisar inicio de obra
+    <svg viewBox="0 0 20 20" aria-hidden="true"><path class="linea" d="M3 10h14M11 4l6 6-6 6"/></svg>
+  </button>
+  <nav aria-label="Principal">
+    <a href="#" aria-current="page"><svg viewBox="0 0 22 22" aria-hidden="true"><path class="linea" d="M6.5 19.5v-17h9v17M3 19.5h16M9.5 6.5h3M9.5 10.5h3M9.5 14.5h3"/></svg>Compra</a>
+    <a href="#"><svg viewBox="0 0 22 22" aria-hidden="true"><path class="linea" d="M5.5 2.5h11v17l-2.75-2-2.75 2-2.75-2-2.75 2zM8.5 7.5h5M8.5 11.5h5"/></svg>Comprobantes</a>
+    <a href="#"><svg viewBox="0 0 22 22" aria-hidden="true"><path class="linea" d="M11 11.5a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM3.5 19.5c1-4 3.8-5.5 7.5-5.5s6.500 1.500 7.500 5.500"/></svg>Cuenta</a>
+  </nav>
+</div>
+
+</body>
+</html>
