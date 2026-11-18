@@ -262,6 +262,28 @@ test('protege el cobro confirmado, las órdenes de pago y los avisos de vencimie
     }
   })
 
+  await t.test('el resumen de compras distingue una cuota pendiente de un depósito en confirmación', async () => {
+    const updateOperation = db.prepare("UPDATE operations SET status = ? WHERE id = 'review-op'")
+    const updateOrder = db.prepare("UPDATE deposits SET status = ? WHERE id = 'review-order'")
+    const nextStep = async () => {
+      const response = await request('/api/ops', 'GET', undefined, headers(buyer))
+      assert.equal(response.status, 200)
+      const operations = await response.json() as { id: string; todo: string }[]
+      return operations.find((operation) => operation.id === 'review-op')?.todo
+    }
+
+    updateOperation.run('awaiting_deposit')
+    try {
+      updateOrder.run('pending')
+      assert.equal(await nextStep(), 'Deposita la cuota inicial')
+      updateOrder.run('paid')
+      assert.equal(await nextStep(), 'Confirmando el depósito')
+    } finally {
+      updateOrder.run('settled')
+      updateOperation.run('funded')
+    }
+  })
+
   await t.test('el tercero recibe un solo aviso por un plazo vencido sin respuesta', async () => {
     const messages: unknown[] = []
     const unsubscribe = subscribe(arbiterId, (message) => messages.push(message))

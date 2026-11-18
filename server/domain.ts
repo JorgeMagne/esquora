@@ -336,7 +336,10 @@ export function todoFor(op: OpRow, tranches: TrancheRow[], role: Role): string |
     return 'Confirma el acuerdo para enviarlo'
   }
   if (role === 'buyer' && op.status === 'invited') return 'Revisa y acepta el acuerdo'
-  if (role === 'buyer' && op.status === 'awaiting_deposit') return 'Deposita la cuota inicial'
+  if (role === 'buyer' && op.status === 'awaiting_deposit') {
+    const paid = get("SELECT 1 FROM deposits WHERE op_id = ? AND status = 'paid' LIMIT 1", op.id)
+    return paid ? 'Confirmando el depósito' : 'Deposita la cuota inicial'
+  }
   if (op.status !== 'funded') return null
   for (const t of tranches) {
     const n = t.idx + 1

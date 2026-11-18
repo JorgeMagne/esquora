@@ -90,6 +90,7 @@ function Purchase({ operation }: { operation: Operation }) {
   const approved = role === 'buyer' && tranches.some((tranche) => tranche.status === 'approved')
   const confirming = tranches.some((tranche) => tranche.pendingAction?.status === 'pending')
   return <article className="purchase">
+    {role === 'buyer' && <Back to="/">Mis compras</Back>}
     <div className="purchase-hero">
       <div className="purchase-subject">
         <h1>{role === 'buyer' ? unit : role === 'arbiter' ? 'Caso ' + unit : unit}</h1>
@@ -176,7 +177,7 @@ function Agreement({ operation, fromOperation = false }: { operation: Operation;
   }
 
   return <>
-    <Back to={fromOperation ? operationPath(id) : '/'}>{fromOperation ? 'Volver a la operación' : 'Operaciones'}</Back>
+    <Back to={fromOperation ? operationPath(id) : '/'}>{fromOperation ? 'Volver a la operación' : role === 'buyer' ? 'Mis compras' : 'Operaciones'}</Back>
     <Title detail={project.name + ' · ' + operation.unit}>Acuerdo de preventa</Title>
     <div className="two-column">
       <div>

@@ -65,7 +65,7 @@ function Shell({ user, children }: { user?: User | null; children: ReactNode }) 
   const location = useLocation()
   const op = useMatch('/operaciones/:id/*')
   const home = user?.kind === 'developer' ? { label: 'Proyectos', icon: Building2 } : user?.kind === 'arbiter' ?
-    { label: 'Casos', icon: FolderOpen } : { label: 'Compra', icon: Building2 }
+    { label: 'Casos', icon: FolderOpen } : { label: 'Mis compras', icon: Building2 }
   const middle = user?.kind === 'developer' ? { label: 'Mi saldo', path: '/saldo', icon: WalletCards } : user?.kind === 'arbiter' ?
     { label: 'Avisos', path: '/avisos', icon: Bell } :
     { label: 'Comprobantes', path: op?.params.id ? operationPath(op.params.id) + '/comprobantes' : '/comprobantes', icon: ReceiptText }

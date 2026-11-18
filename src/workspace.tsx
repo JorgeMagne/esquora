@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { ArrowDown, ArrowRight, ArrowUp, Plus, Trash2 } from 'lucide-react'
-import { Link, Navigate, useNavigate, useParams } from 'react-router'
+import { ArrowDown, ArrowRight, ArrowUp, ChevronRight, Plus, Trash2 } from 'lucide-react'
+import { Link, useNavigate, useParams } from 'react-router'
 import { netAfterFees } from '../shared/fees.ts'
 import {
   invitationPath, operationPath, projectPath, read, resolverInvitationPath, uploadFile, useSession, write, type Invitation, type Operation,
@@ -15,24 +15,81 @@ import { ActionLink, Amount, Back, Empty, Feedback, Field, FileRow, Loading, Row
 
 export function Home({ user }: { user: User }) {
   if (user.kind === 'developer') return <DeveloperHome />
-  return <OperationList user={user} />
+  if (user.kind === 'arbiter') return <CasesHome />
+  return <BuyerHome />
 }
 
-function OperationList({ user }: { user: User }) {
+function BuyerHome() {
   const list = read<OperationSummary[]>('/ops')
-  const arbiter = user.kind === 'arbiter'
-  if (list.isPending) return <Loading>Buscando tus operaciones…</Loading>
+  const current: OperationSummary[] = []
+  const history: OperationSummary[] = []
+  let protectedTotal = 0
+  for (const operation of list.data ?? []) {
+    if (['closed', 'declined', 'cancelled'].includes(operation.status)) history.push(operation)
+    else current.push(operation)
+    protectedTotal += operation.totals.held
+  }
+
+  return <div className="buyer-home">
+    <Title>Mis compras</Title>
+    {list.isPending && <Loading>Buscando tus compras…</Loading>}
+    {list.isError && <Feedback error={list.error} onRetry={() => void list.refetch()} />}
+    {list.isSuccess && <div className="buyer-home-layout">
+      <div>
+        {protectedTotal > 0 && <div className="buyer-protected">
+          <p>Total protegido en tus compras</p>
+          <Amount cents={protectedTotal} />
+        </div>}
+        {current.length > 0 && <BuyerPurchases title="En curso" operations={current} />}
+        {history.length > 0 && <BuyerPurchases title="Historial" operations={history} />}
+        {list.data.length === 0 && <Empty title="Todavía no tienes compras">
+          Cuando tu desarrollador te comparta un enlace de invitación, ábrelo con el correo indicado en el acuerdo.
+        </Empty>}
+      </div>
+      <AccessPlan />
+    </div>}
+  </div>
+}
+
+function BuyerPurchases({ title, operations }: { title: string; operations: OperationSummary[] }) {
+  return <section className="buyer-purchases">
+    <h2>{title}</h2>
+    <ul className="buyer-purchase-list">
+      {operations.map((operation) => {
+        const held = operation.totals.held
+        const label = operation.status === 'funded' ? 'Sin acciones pendientes' : operationLabels[operation.status]
+        return <li key={operation.id}>
+          <Link className="buyer-purchase-link" to={operationPath(operation.id)}>
+            <span className="buyer-purchase-property">
+              <strong>{operation.project.name}</strong>
+              <small>{[operation.unit, operation.project.city].filter(Boolean).join(' · ')}</small>
+            </span>
+            <span className="buyer-purchase-status">{operation.todo ?? label ?? 'Operación'}</span>
+            {held > 0 && <span className="buyer-purchase-amount">
+              <strong>{money(held)}</strong>
+              <small>Protegidos</small>
+            </span>}
+            <ChevronRight size={17} aria-hidden="true" />
+          </Link>
+        </li>
+      })}
+    </ul>
+  </section>
+}
+
+function CasesHome() {
+  const list = read<OperationSummary[]>('/ops')
+  if (list.isPending) return <Loading>Buscando tus casos…</Loading>
   if (list.isError) return <Feedback error={list.error} onRetry={() => void list.refetch()} />
-  if (list.data.length === 1 && !arbiter) return <Navigate to={operationPath(list.data[0].id)} replace />
   return <>
-    <Title>{arbiter ? 'Casos' : 'Mis compras'}</Title>
+    <Title>Casos</Title>
     {list.data.length ? <div className="workspace-plan">
       <div className="row-list">{list.data.map((operation) => <OperationRow key={operation.id} operation={operation} />)}</div>
       <AccessPlan />
     </div> :
       <div className="empty-with-plan">
-        <Empty title={arbiter ? 'No tienes casos pendientes' : 'Todavía no tienes una compra'}>
-          {arbiter ? 'Cuando te corresponda intervenir, encontrarás aquí el expediente.' : 'Abre el enlace que te envíe tu desarrollador para revisar el acuerdo de preventa.'}
+        <Empty title="No tienes casos pendientes">
+          Cuando te corresponda intervenir, encontrarás aquí el expediente.
         </Empty><AccessPlan />
       </div>}
   </>

@@ -89,6 +89,34 @@ a.avatar:hover::before { background: var(--blue-wash); border-color: var(--blue)
 .workspace-columns { margin-top: 30px; }
 .workspace-plan { display: grid; grid-template-columns: minmax(0, 1fr) minmax(210px, .42fr); align-items: center; gap: 28px; }
 .workspace-plan .access-plan-frame { justify-self: end; width: min(100%, 260px); }
+.buyer-home { max-width: 1080px; margin-inline: auto; }
+.buyer-home-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(190px, .38fr); align-items: start; gap: clamp(24px, 4vw, 54px); }
+.buyer-home-layout > .access-plan-frame { justify-self: end; width: min(100%, 290px); }
+.buyer-protected { padding: 15px 0 19px; margin-bottom: 24px; border-block: 1px solid var(--line); }
+.buyer-protected p { margin: 0 0 6px; color: var(--muted); }
+.buyer-protected .amount { color: var(--blue-dark); }
+.buyer-purchases + .buyer-purchases { margin-top: 27px; }
+.buyer-purchases h2 { margin-bottom: 10px; }
+.buyer-purchase-list { list-style: none; padding: 0; border-top: 1px solid var(--line); }
+.buyer-purchase-link {
+  display: grid;
+  grid-template-columns: minmax(0, 1.06fr) minmax(0, 1.22fr) minmax(0, .49fr) 17px;
+  grid-template-areas: "property status amount arrow";
+  align-items: center;
+  gap: 6px 14px;
+  min-height: 70px;
+  padding: 12px 2px;
+  border-bottom: 1px solid var(--line);
+  text-decoration: none;
+}
+.buyer-purchase-link:is(:hover, :focus-visible) { color: var(--blue-dark); background: var(--blue-wash); }
+.buyer-purchase-link span { min-width: 0; overflow-wrap: anywhere; }
+.buyer-purchase-link :is(strong, small) { display: block; }
+.buyer-purchase-link small, .buyer-purchase-status, .buyer-purchase-link > svg { color: var(--muted); }
+.buyer-purchase-property { grid-area: property; }
+.buyer-purchase-status { grid-area: status; }
+.buyer-purchase-amount { grid-area: amount; text-align: right; }
+.buyer-purchase-link > svg { grid-area: arrow; }
 .empty-with-plan { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, .7fr); align-items: center; gap: 24px; max-width: 920px; }
 .empty-with-plan .access-plan-frame { justify-self: end; }
 .empty { padding: 16px 0 30px; }
@@ -336,6 +364,13 @@ a.avatar:hover::before { background: var(--blue-wash); border-color: var(--blue)
   .empty-with-plan { grid-template-columns: minmax(0, 1fr); gap: 0; }
   .workspace-plan { grid-template-columns: minmax(0, 1fr); gap: 12px; }
   .workspace-plan .access-plan-frame { justify-self: center; width: min(100%, 225px); }
+  .buyer-home-layout { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .buyer-home-layout > .access-plan-frame { justify-self: center; width: min(100%, 240px); }
+  .buyer-purchase-link {
+    grid-template-columns: minmax(0, 1fr) fit-content(38%) 17px;
+    grid-template-areas: "property amount arrow" "status status arrow";
+    column-gap: 9px;
+  }
   .page:has(.purchase) { padding-top: 12px; }
   .purchase-hero { grid-template-columns: minmax(0, 1fr) 116px; min-height: 230px; gap: 12px; }
   .purchase-subject h1 { font-size: 2.6rem; }
