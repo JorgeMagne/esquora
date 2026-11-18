@@ -54,3 +54,19 @@
   gap: 10px;
   max-width: 66ch;
 }
+
+.draft-next-step {
+  display: grid;
+  grid-template-columns: minmax(0, 1.24fr) minmax(260px, .86fr);
+  align-items: start;
+  gap: 14px 44px;
+}
+
+.draft-next-step p { margin: 7px 0 0; color: var(--muted); overflow-wrap: anywhere; }
+.draft-next-step .invite-share { margin-top: 0; }
+.draft-next-step > .stack { margin-top: 0; }
+.draft-next-step > .text-link { justify-self: start; }
+
+@media (max-width: 760px) {
+  .draft-next-step { grid-template-columns: minmax(0, 1fr); }
+}

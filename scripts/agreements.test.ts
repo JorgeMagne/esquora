@@ -176,6 +176,8 @@ test('la invitación se reclama con el correo exacto y una cuenta activa y actua
   assert.equal(nominated.arbiterEmail, target)
   assert.ok(nominated.arbiterInviteToken)
   const previousSignature = sign(seller.key, nominated.termsDigest)
+  const waitingForThird = await request(`${op}/send`, { method: 'POST', cookie: seller.cookie, body: { signature: previousSignature } })
+  assert.equal(waitingForThird.status, 409)
   const invite = `/api/resolver-invitations/${nominated.arbiterInviteToken}`
   const invitation = await json<{ status: string; mine: boolean }>(await request(invite))
   assert.deepEqual(invitation, { mine: false })

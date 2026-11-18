@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { ArrowRight, Check, Copy } from 'lucide-react'
 import { Link, useNavigate, useParams } from 'react-router'
@@ -149,6 +149,7 @@ function Agreement({ operation, fromOperation = false }: { operation: Operation;
   const [note, setNote] = useState('')
   const [resolutionConsent, setResolutionConsent] = useState(false)
   const [unsavedResolver, setUnsavedResolver] = useState<string | null>(null)
+  const nextStep = useRef<HTMLElement>(null)
   const route = '/ops/' + id
   const canAccept = role === 'buyer' && status === 'invited'
   const sellerDraft = role === 'seller' && status === 'draft'
@@ -160,6 +161,8 @@ function Agreement({ operation, fromOperation = false }: { operation: Operation;
   const resolutionTerms = operation.resolutionTerms
   const requiresConsent = resolutionMode === 'esquora'
   const inviteUrl = operation.inviteToken && new URL(invitationPath(operation.inviteToken), window.location.origin).href
+  const waitingForThird = resolutionMode === 'external' && !resolverReady && operation.arbiterInviteToken
+  const thirdInviteUrl = waitingForThird && new URL(resolverInvitationPath(waitingForThird), window.location.origin).href
   const fees = tranches.reduce((total, { amount }) => total + amount - netAfterFees(amount, operation.feeBps), 0)
 
   async function refresh() {
@@ -179,6 +182,41 @@ function Agreement({ operation, fromOperation = false }: { operation: Operation;
   return <>
     <Back to={fromOperation ? operationPath(id) : '/'}>{fromOperation ? 'Volver a la operación' : role === 'buyer' ? 'Mis compras' : 'Operaciones'}</Back>
     <Title detail={project.name + ' · ' + operation.unit}>Acuerdo de preventa</Title>
+    {sellerDraft && <section ref={nextStep} className="section draft-next-step" tabIndex={-1} aria-label="Envío del acuerdo">
+      <div role="status">
+        {canSend ? <>
+          <h2>Listo para enviar al comprador</h2>
+          <p>{resolutionMode === 'external' ? 'El tercero ya aceptó la designación. Confirma el acuerdo para generar el enlace del comprador.' :
+            'Confirma el acuerdo para generar el enlace del comprador.'}</p>
+        </> : resolverChanged ? <>
+          <h2>Cambios pendientes de guardar</h2>
+          <p>Guarda la modalidad de resolución antes de continuar.</p>
+        </> : thirdInviteUrl ? <>
+          <h2>Esperando al tercero designado</h2>
+          <p>Comparte el enlace con <strong>{operation.arbiterEmail}</strong>. Esa persona debe entrar con ese correo, activar su cuenta y pulsar <strong>Aceptar designación</strong>.</p>
+        </> : <>
+          <h2>{resolutionMode === 'esquora' ? 'Verificación de ESQUORA pendiente' : 'Completa la resolución del acuerdo'}</h2>
+          <p>{resolutionMode === 'esquora' ? 'La cuenta verificadora de ESQUORA debe estar activa para enviar el acuerdo.' :
+            'Elige cómo se resolverán las devoluciones y los desacuerdos y guarda esa modalidad.'}</p>
+        </>}
+      </div>
+      {canSend ? <div className="stack">
+        <Feedback error={task.error} />
+        {canSign ? <button className="button primary" type="button" disabled={task.busy || (requiresConsent && !resolutionTerms)}
+          onClick={() => { setResolutionConsent(false); setDialog('send') }}>
+          {task.busy ? 'Confirmando…' : 'Enviar al comprador'}<ArrowRight size={18} aria-hidden="true" />
+        </button> : <ReconnectLink />}
+      </div> : !resolverChanged && thirdInviteUrl ?
+        <InviteShare url={thirdInviteUrl} label="Enlace para el tercero designado" /> :
+        <a className="text-link" href="#resolucion-del-acuerdo">Ir a la resolución del acuerdo</a>}
+    </section>}
+    {role === 'seller' && status === 'invited' && inviteUrl && <section className="section draft-next-step" aria-label="Invitación del comprador">
+      <div role="status">
+        <h2>Invitación lista para compartir</h2>
+        <p>Comparte este enlace con el comprador para que pueda revisar y aceptar el acuerdo.</p>
+      </div>
+      <InviteShare url={inviteUrl} label="Enlace para el comprador" />
+    </section>}
     <div className="two-column">
       <div>
         <section className="section">
@@ -203,6 +241,7 @@ function Agreement({ operation, fromOperation = false }: { operation: Operation;
           onUpdate={(updated) => {
             setUnsavedResolver(null)
             query.setQueryData([route], updated)
+            nextStep.current?.focus()
             void refresh()
           }} />}
         {requiresConsent && resolutionTerms && <section className="section" aria-label={resolutionTerms.title}>
@@ -227,26 +266,24 @@ function Agreement({ operation, fromOperation = false }: { operation: Operation;
           <div><dt>Comisiones estimadas</dt><dd>{money(fees)}</dd></div>
         </dl>
         <p className="muted">Las comisiones se descuentan cuando se entrega o se devuelve cada tramo.</p>
-        <Feedback error={task.error || (operation.deploymentError ? 'No pudimos registrar la protección. Vuelve a confirmar el acuerdo.' : null)}>
+        <Feedback error={(!canSend && task.error) || (operation.deploymentError ? 'No pudimos registrar la protección. Vuelve a confirmar el acuerdo.' : null)}>
           {operation.declineReason && 'Motivo del rechazo: ' + operation.declineReason}
         </Feedback>
         {status === 'deploying' && <Loading>Confirmando el acuerdo…</Loading>}
         {depositInProgress(operation.depositOrder?.status) && <Loading>Confirmando el depósito…</Loading>}
-        {sellerDraft && resolverChanged && <p className="muted">Guarda el cambio de resolución antes de enviar el acuerdo.</p>}
         {canAccept && user?.walletStatus !== 'active' && <ActionLink to={'/cuenta?volver=' + encodeURIComponent(operationPath(id))}>Activar mi cuenta</ActionLink>}
-        {(canSend || (canAccept && user?.walletStatus === 'active')) && (canSign ?
+        {canAccept && user?.walletStatus === 'active' && (canSign ?
           <button className="button primary" type="button" disabled={task.busy || (requiresConsent && !resolutionTerms)}
-            onClick={() => { setResolutionConsent(false); setDialog(canSend ? 'send' : 'accept') }}>
-            {task.busy ? 'Confirmando…' : canSend ? 'Enviar invitación' : 'Aceptar acuerdo'}<ArrowRight size={18} aria-hidden="true" />
+            onClick={() => { setResolutionConsent(false); setDialog('accept') }}>
+            {task.busy ? 'Confirmando…' : 'Aceptar acuerdo'}<ArrowRight size={18} aria-hidden="true" />
           </button> : <ReconnectLink />)}
         {canAccept && <button className="text-button" type="button" disabled={task.busy} onClick={() => setDialog('decline')}>Rechazar acuerdo</button>}
         {role === 'buyer' && status === 'awaiting_deposit' && <ActionLink to={operationPath(id)}>Ir a la cuota inicial</ActionLink>}
-        {role === 'seller' && status === 'invited' && inviteUrl && <InviteShare url={inviteUrl} label="Enlace para el comprador" />}
         {role === 'seller' && ['draft', 'invited'].includes(status) &&
           <button className="text-button" type="button" disabled={task.busy} onClick={() => setDialog('cancel')}>Retirar acuerdo</button>}
       </section>
     </div>
-    {dialog && <Dialog title={{ accept: 'Aceptar el acuerdo', send: 'Enviar invitación', cancel: 'Retirar acuerdo', decline: 'Rechazar el acuerdo' }[dialog]}
+    {dialog && <Dialog title={{ accept: 'Aceptar el acuerdo', send: 'Enviar al comprador', cancel: 'Retirar acuerdo', decline: 'Rechazar el acuerdo' }[dialog]}
       onClose={() => setDialog(null)}>
       <form className="stack" onSubmit={(event) => {
         event.preventDefault()
@@ -277,15 +314,17 @@ function DraftResolver({ operation, mode: savedMode, ready, onChange, onUpdate }
   const [mode, setMode] = useState(savedMode)
   const [email, setEmail] = useState(operation.arbiterEmail ?? '')
   const task = useWork()
-  const pendingInvite = savedMode === 'external' && !ready && operation.arbiterInviteToken
   const isChanged = (selected: ResolutionMode, selectedEmail: string) => selected !== savedMode ||
-    (selected === 'external' && selectedEmail.trim() !== (operation.arbiterEmail ?? ''))
+    (selected === 'external' && selectedEmail.trim().toLowerCase() !== (operation.arbiterEmail ?? ''))
   const changed = isChanged(mode, email)
   const refreshEsquora = mode === 'esquora' && savedMode === 'esquora' && !ready
+  const needsInvite = mode === 'external' && savedMode === 'external' && !ready && !operation.arbiterInviteToken
+  const canSave = changed || refreshEsquora || needsInvite
 
-  return <section className="section">
+  return <section className="section" id="resolucion-del-acuerdo">
     <h2>Resolución del acuerdo</h2>
     <form className="stack" onSubmit={task.submit(async () => {
+      if (!canSave) return
       const updated = await write<Operation>('/ops/' + operation.id + '/resolver', {
         resolutionMode: mode, ...(mode === 'external' && { arbiterEmail: email.trim() }),
       }, 'PATCH')
@@ -299,16 +338,10 @@ function DraftResolver({ operation, mode: savedMode, ready, onChange, onUpdate }
         onChange(isChanged(mode, selected))
       }} />
       <Feedback error={task.error} />
-      <button className="button secondary" type="submit" disabled={task.busy || (!changed && !refreshEsquora)}>
-        {task.busy ? 'Guardando…' : refreshEsquora ? 'Comprobar disponibilidad' : 'Guardar resolución'}
-      </button>
+      {canSave && <button className="button secondary" type="submit" disabled={task.busy}>
+        {task.busy ? 'Guardando…' : refreshEsquora ? 'Comprobar disponibilidad' : needsInvite && !changed ? 'Generar enlace para el tercero' : 'Guardar resolución'}
+      </button>}
     </form>
-    {pendingInvite && <>
-      <p className="muted">Comparte este enlace con {operation.arbiterEmail || 'el tercero'}. Podrás enviar el acuerdo cuando acepte.</p>
-      <InviteShare url={new URL(resolverInvitationPath(pendingInvite), window.location.origin).href} label="Enlace para el tercero designado" />
-    </>}
-    {ready && savedMode === 'external' && <p>El tercero aceptó la designación.</p>}
-    {!ready && savedMode === 'esquora' && <p>La cuenta verificadora de ESQUORA está pendiente de activación. Puedes conservar el borrador o invitar a un tercero.</p>}
   </section>
 }
 
