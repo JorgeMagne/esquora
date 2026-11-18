@@ -24,10 +24,15 @@ const styles = `
   label { font-weight: 600; }
   input, button { min-width: 0; min-height: 48px; border-radius: 6px; font: inherit; }
   input { color: inherit; padding: 8px 12px; border: 1px solid #7e8995; }
+  input:focus { border-color: #1460a5; }
   button { margin-top: 6px; border: 0; padding: 8px 12px; color: white; background: #243b53; cursor: pointer; font-weight: 650; }
   button:hover { background: #172839; }
   :focus-visible { outline: 3px solid #1460a5; outline-offset: 3px; }
   [role=alert] { color: #9e2c26; margin: 0; }
+  @media (prefers-reduced-motion: no-preference) {
+    input { transition: border-color 150ms ease; }
+    button { transition: background-color 150ms ease; }
+  }
 `
 const formPolicy = "default-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; style-src 'sha256-" +
   codeDigest(styles).digest('base64') + "'"

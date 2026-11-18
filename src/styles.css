@@ -88,7 +88,7 @@ a.avatar:hover::before { background: var(--blue-wash); border-color: var(--blue)
 .two-column > * { min-width: 0; }
 .workspace-columns { margin-top: 30px; }
 .empty-with-plan { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, .7fr); align-items: center; gap: 24px; max-width: 920px; }
-.empty-with-plan .access-plan { justify-self: end; }
+.empty-with-plan .access-plan-figure { justify-self: end; }
 .empty { padding: 16px 0 30px; }
 .empty h2 { font-size: 1.32rem; }
 .empty p { color: var(--muted); margin: 9px 0 0; }
@@ -107,8 +107,10 @@ a.avatar:hover::before { background: var(--blue-wash); border-color: var(--blue)
 .text-button:hover:not(:disabled), .text-link:hover, .external-link:hover { color: var(--blue-dark); text-decoration-thickness: 2px; }
 .field { display: grid; gap: 6px; min-width: 0; align-content: start; font-size: .94rem; margin: 0; }
 .field > span { font-weight: 700; }
+.field:focus-within > span { color: var(--blue-dark); }
 .field > small { font-size: .83rem; color: var(--muted); }
 .field input, .field textarea, .field select { box-sizing: border-box; border: 1px solid var(--control-line); border-radius: 0; background: transparent; width: 100%; min-height: 48px; padding: 10px 11px; caret-color: var(--blue); font-size: 1rem; }
+.field :is(input, textarea, select):focus { border-color: var(--blue); }
 .field input::placeholder, .field textarea::placeholder { color: var(--muted); }
 .field input[type="file"] { padding: 6px; }
 .field input[type="file"]::file-selector-button { padding: 6px 8px; border: 0; background: var(--blue-wash); color: var(--blue-dark); font: inherit; margin-right: 8px; }
@@ -196,7 +198,7 @@ a.avatar:hover::before { background: var(--blue-wash); border-color: var(--blue)
 .invitation-copy .button { margin-top: 16px; }
 .invite-amount { padding: 15px 0; border-top: 1px solid var(--line); }
 .invite-amount p { margin: 0 0 4px; }
-.invitation-plan .access-plan { margin-inline: auto; }
+.invitation-plan .access-plan-figure { margin-inline: auto; }
 .invite-share { margin-top: 18px; }
 
 .purchase { max-width: 970px; margin-inline: auto; }
@@ -217,11 +219,13 @@ a.avatar:hover::before { background: var(--blue-wash); border-color: var(--blue)
 .tower-registration { opacity: 0; }
 .tower-documented .tower-registration { opacity: .55; }
 .tower-started .tower-floors { stroke-dasharray: none; opacity: .6; }
-.access-plan { display: block; width: min(100%, 420px); height: auto; color: var(--ink); }
+.access-plan-figure { position: relative; width: min(100%, 420px); }
+.access-plan { display: block; width: 100%; height: auto; color: var(--ink); }
 .access-plan-guides { opacity: .3; }
 .access-plan-background { stroke: color-mix(in srgb, currentColor 42%, var(--paper)); }
 .access-plan-buildings { stroke: color-mix(in srgb, currentColor 63%, var(--paper)); }
 .access-plan-grid { opacity: .52; }
+.access-plan-current, .access-plan-toggle { display: none; }
 .plan-guides { opacity: .3; }
 .plan-neighbors { opacity: .46; }
 .plan-face { fill: var(--plan-paper, var(--paper)); }
@@ -231,8 +235,40 @@ a.avatar:hover::before { background: var(--blue-wash); border-color: var(--blue)
 .plan-protected .plan-vault-door { stroke: var(--blue); fill: var(--blue-wash); }
 @media (prefers-reduced-motion: no-preference) {
   .plan-trace, .tower-outline { stroke-dasharray: 100 100; animation: trace-plan 620ms cubic-bezier(.25, 1, .4, 1) both; }
+  .access-plan-current {
+    display: inline;
+    stroke: var(--blue);
+    stroke-width: 1.4;
+    stroke-dasharray: 1.2 1.4 1.2 1.4 1.2 93.6;
+    opacity: .74;
+    animation: trace-facade 9s -2.1s linear infinite paused;
+  }
+  .access-plan-current-back { opacity: .46; animation-delay: -6.4s; }
+  .access-plan-current-side { opacity: .61; animation-delay: -4.8s; }
+  .access-plan-figure[data-moving="true"] .access-plan-current { animation-play-state: running; }
+  .access-plan-toggle {
+    display: grid;
+    place-items: center;
+    position: absolute;
+    inset: auto 0 0 auto;
+    width: 44px;
+    height: 44px;
+    color: var(--muted);
+    background: none;
+    border: 0;
+    transition: color 150ms ease;
+  }
+  .access-plan-toggle:hover, .access-plan-toggle:focus-visible { color: var(--blue-dark); }
+  .field > span, .field :is(input, textarea, select) { transition: color 150ms ease, border-color 150ms ease; }
+  .button .lucide-arrow-right { transition: transform 180ms cubic-bezier(.2, .75, .25, 1); }
+  .access-form > .stack, .access-form > .feedback { animation: reveal-access-step 200ms cubic-bezier(.2, .75, .25, 1) both; }
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .button:not(:disabled):hover .lucide-arrow-right { transform: translateX(3px); }
 }
 @keyframes trace-plan { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
+@keyframes trace-facade { from { stroke-dashoffset: 0; } to { stroke-dashoffset: -100; } }
+@keyframes reveal-access-step { from { opacity: .68; transform: translateY(3px); } }
 .condition-meter { display: flex; gap: 3px; height: 12px; margin: 0 0 5px; }
 .condition-meter > i { flex-basis: 0; min-width: 4px; width: auto; height: 100%; }
 .condition-list { list-style: none; padding: 0; }
@@ -292,7 +328,7 @@ a.avatar:hover::before { background: var(--blue-wash); border-color: var(--blue)
   .invitation { grid-template-columns: minmax(0, 1fr); gap: 19px; margin-top: 5px; }
   .invitation-copy h1 { font-size: 2.7rem; }
   .invitation-copy h1 span { font-size: 1.17rem; }
-  .invitation-plan, .empty-with-plan .access-plan { justify-self: center; width: min(100%, 360px); }
+  .invitation-plan, .empty-with-plan .access-plan-figure { justify-self: center; width: min(100%, 360px); }
   .invitation-copy .button { width: 100%; }
   .empty-with-plan { grid-template-columns: minmax(0, 1fr); gap: 0; }
   .page:has(.purchase) { padding-top: 12px; }

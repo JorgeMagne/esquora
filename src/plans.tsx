@@ -1,4 +1,5 @@
-import { useId } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
+import { Pause, Play } from 'lucide-react'
 
 function TracedOutline({ d }: { d: string }) {
   const id = useId()
@@ -15,6 +16,39 @@ function TracedOutline({ d }: { d: string }) {
 }
 
 export function AccessPlan() {
+  const figure = useRef<HTMLDivElement>(null)
+  const [visible, setVisible] = useState(false)
+  const [paused, setPaused] = useState(false)
+
+  useEffect(() => {
+    const element = figure.current
+    if (!element) return
+    let inView = !('IntersectionObserver' in window)
+    const updateVisibility = () => setVisible(inView && !document.hidden)
+    const observer = inView ? null : new IntersectionObserver(([entry]) => {
+      inView = entry.isIntersecting
+      updateVisibility()
+    })
+    observer?.observe(element)
+    document.addEventListener('visibilitychange', updateVisibility)
+    updateVisibility()
+    return () => {
+      observer?.disconnect()
+      document.removeEventListener('visibilitychange', updateVisibility)
+    }
+  }, [])
+
+  const action = paused ? 'Reanudar animación del plano' : 'Pausar animación del plano'
+  return <div ref={figure} className="access-plan-figure" data-moving={visible && !paused}>
+    <AccessDrawing />
+    <button type="button" className="access-plan-toggle" aria-label={action} title={action}
+      onClick={() => setPaused((previous) => !previous)}>
+      {paused ? <Play size={13} aria-hidden="true" /> : <Pause size={13} aria-hidden="true" />}
+    </button>
+  </div>
+}
+
+function AccessDrawing() {
   const towerOutline = 'M284 256V113h24v-12h26v12h22v143'
   return <svg className="access-plan" width="420" height="308" viewBox="0 0 420 308"
     fill="none" aria-hidden="true" focusable="false">
@@ -29,6 +63,7 @@ export function AccessPlan() {
       <path className="plan-face plan-side" d="M164 48l23-14v175l-23 14zM351 41l23-14v178l-23 13z" />
       <path className="plan-face plan-roof" d="M98 48l23-14h66l-23 14zM298 41l23-14h53l-23 14z" />
       <path d="M114 61v152m17-152v152m17-152v152m166-159v150m20-150v150M98 69h66m-66 17h66m-66 17h66m134-40h53l23-14m-76 35h53l23-14m-76 35h53l23-14" strokeDasharray="2 3.5" />
+      <path className="access-plan-current access-plan-current-back" pathLength="100" d="M351 148V41l23-14v156" />
     </g>
 
     <g className="access-plan-buildings" strokeWidth="1">
@@ -41,6 +76,7 @@ export function AccessPlan() {
       <path className="plan-face plan-side" d="M130 139l24-14v120l-24 14z" />
       <path className="plan-face plan-roof" d="M36 139l24-14h94l-24 14z" />
       <path d="M48 259V153h68v106M48 175h68m-68 24h68m-68 24h68m-68 24h68M71 153v106m22-106v106M130 161l24-14m-24 37 24-14m-24 37 24-14m-24 37 24-14" strokeDasharray="2 3" />
+      <path className="access-plan-current access-plan-current-side" pathLength="100" d="M36 259V139l24-14h94v120" />
     </g>
 
     <g stroke="currentColor" strokeWidth="1.1">
@@ -53,6 +89,7 @@ export function AccessPlan() {
       <path d="M277 212h4" stroke="var(--blue)" />
     </g>
     <TracedOutline d={towerOutline} />
+    <path className="access-plan-current" pathLength="100" d={towerOutline} />
 
     <path className="plan-face plan-roof" d="M126 194l26-15h124l-26 15z" />
     <path className="plan-face plan-side" d="M250 194l26-15v79l-26 15z" />
