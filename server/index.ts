@@ -2,13 +2,22 @@ import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { serve } from '@hono/node-server'
 import { serveStatic } from '@hono/node-server/serve-static'
-import { PORT, ROOT, TEST_AUTH_TOKEN, validateConfig } from './config.ts'
+import { Hono } from 'hono'
+import { APP_URL, PORT, ROOT, TEST_AUTH_TOKEN, validateConfig } from './config.ts'
 import { app } from './app.ts'
 import { reconcileQueue, recoverPending } from './chain.ts'
 import { notifyExpiredRefunds } from './domain.ts'
+import { privateAccess } from './private-access.ts'
 import { bootstrap } from './stellar.ts'
 
 validateConfig()
+const credentials = process.env.ESQUORA_PREVIEW_CREDENTIALS?.trim() ?? ''
+const server = new Hono()
+if (process.env.NODE_ENV === 'production' || credentials) {
+  server.use('*', privateAccess({ origin: APP_URL, credentials }))
+}
+server.all('*', (c) => app.fetch(c.req.raw))
+
 const dist = join(ROOT, 'dist')
 const entry = join(dist, 'index.html')
 if (existsSync(entry)) {
@@ -38,6 +47,6 @@ setInterval(() => {
   void reconcileQueue().catch(() => console.error('La verificación de movimientos pendientes se volverá a intentar.'))
 }, 15_000).unref()
 
-serve({ fetch: app.fetch, port: PORT, hostname: TEST_AUTH_TOKEN ? '127.0.0.1' : (process.env.HOST || '0.0.0.0') }, (info) => {
+serve({ fetch: server.fetch, port: PORT, hostname: TEST_AUTH_TOKEN ? '127.0.0.1' : (process.env.HOST || '0.0.0.0') }, (info) => {
   console.log('API de ESQUORA en http://localhost:' + info.port)
 })
