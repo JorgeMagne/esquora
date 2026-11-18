@@ -14,7 +14,7 @@ import { ReconnectLink, useAgreementSignature, useChainAction, useSigningAvailab
 import type { ActionPrompt } from './signing.tsx'
 import { ResolverOptions } from './resolver-options.tsx'
 import { ResolutionInstruction } from './resolution.tsx'
-import { ActionLink, Amount, Back, Dialog, ExplorerLink, Feedback, Field, FileRow, Loading, Submit, Title, TotalsStrip, useWork } from './ui.tsx'
+import { ActionLink, Amount, Back, Dialog, ExplorerLink, Feedback, Field, FileRow, Loading, Submit, Title, useWork } from './ui.tsx'
 
 const percent = new Intl.NumberFormat('es-BO', { style: 'percent', maximumFractionDigits: 2 })
 
@@ -86,6 +86,9 @@ function DepositReview({ operation }: { operation: Operation }) {
 
 function Purchase({ operation }: { operation: Operation }) {
   const { id, project, unit, tranches, totals, deposit, role } = operation
+  const reconciled = totals.fees != null && totals.held + totals.released + totals.refunded + totals.fees === deposit
+  const settled = operation.status === 'closed' && totals.held === 0 && reconciled
+  const showDeposit = settled || !reconciled
   const next = tranches.find((tranche) => tranche.pendingAction?.status !== 'pending' && conditionButton(operation, tranche))
   const approved = role === 'buyer' && tranches.some((tranche) => tranche.status === 'approved')
   const confirming = tranches.some((tranche) => tranche.pendingAction?.status === 'pending')
@@ -96,9 +99,8 @@ function Purchase({ operation }: { operation: Operation }) {
         <h1>{role === 'buyer' ? unit : role === 'arbiter' ? 'Caso ' + unit : unit}</h1>
         <p className="purchase-location">{operation.unitDetail || project.name}<span>{operation.unitDetail ? project.name : project.city}</span></p>
         <div className="purchase-money">
-          <Amount cents={totals.held} />
-          <p className="protected-label">protegidos</p>
-          <p className="muted">de {numberAmount(deposit)} de cuota inicial</p>
+          <Amount cents={showDeposit ? deposit : totals.held} />
+          <p className="protected-label">{settled ? 'Cuota inicial liquidada' : showDeposit ? 'Cuota inicial depositada' : 'aún protegidos'}</p>
         </div>
       </div>
       <figure className="purchase-figure">
@@ -106,6 +108,22 @@ function Purchase({ operation }: { operation: Operation }) {
         <figcaption>Corte ilustrativo</figcaption>
       </figure>
     </div>
+    <section className="purchase-breakdown" aria-labelledby="purchase-breakdown-title">
+      <h2 id="purchase-breakdown-title">Desglose de la cuota</h2>
+      <dl className="totals-strip purchase-totals">
+        <div><dt>Cuota inicial depositada</dt><dd>{money(deposit)}</dd></div>
+        <div><dt>Aún protegido</dt><dd>{money(totals.held)}</dd></div>
+        <div><dt>Entregado al desarrollador</dt><dd>{money(totals.released)}</dd></div>
+        <div>
+          <dt>Devuelto al comprador</dt><dd>{money(totals.refunded)}</dd>
+          {role === 'buyer' && totals.refunded > 0 && <dd className="purchase-refund-link">
+            <Link className="text-link" to={'/saldo?devolucion=' + encodeURIComponent(id)}>Ver devolución en Mi saldo</Link>
+          </dd>}
+        </div>
+        <div><dt>Comisiones cobradas</dt><dd>{totals.fees == null ? 'Por conciliar' : money(totals.fees)}</dd></div>
+      </dl>
+      {!reconciled && <p className="muted">Algunos movimientos todavía están por conciliar.</p>}
+    </section>
     <div className="condition-meter" role="img" aria-label={tranches.map((tranche) => tranche.title + ', ' + conditionState(tranche)).join('. ')}>
       {tranches.map((tranche) => <i className={'swatch ' + conditionAmounts(tranche).state} key={tranche.id} style={{ flexGrow: tranche.amount }} />)}
     </div>
@@ -124,7 +142,6 @@ function Purchase({ operation }: { operation: Operation }) {
       </Link></li>})}
     </ul>
     <div className="purchase-below">
-      <TotalsStrip totals={totals} showProtected={false} />
       {approved && !next && <Feedback>El desarrollador ya puede recibir el pago.</Feedback>}
       {confirming && <Loading>Confirmando…</Loading>}
       {!confirming && !approved && !next && operation.todo && <p className="muted">{operation.todo}</p>}
@@ -401,6 +418,10 @@ function ConditionDetail({ operation, tranche }: { operation: Operation; tranche
   const esquoraResolution = operation.resolutionMode === 'esquora' &&
     ['disputed', 'refund_requested', 'refunded', 'resolved'].includes(tranche.status)
   const settlement = conditionAmounts(tranche)
+  const settlementTitle = settlement.state === 'returned' ? 'Devolución confirmada' :
+    settlement.state === 'delivered' ? 'Pago entregado' : 'Reparto confirmado'
+  const settlementReceipt = settlement.state === 'returned' ? 'Ver comprobante de devolución' :
+    settlement.state === 'delivered' ? 'Ver comprobante del pago' : 'Ver comprobante del reparto'
   const canDispute = operation.status === 'funded' && role !== 'arbiter' && !locked && canOpenConditionDispute(tranche.status)
   const responseDeadline = tranche.refundResponseDueAt ?? (tranche.refundRequestedAt ?
     new Date(Date.parse(tranche.refundRequestedAt) + operation.refundResponseHours * 3600000).toISOString() : null)
@@ -455,18 +476,23 @@ function ConditionDetail({ operation, tranche }: { operation: Operation; tranche
         {presentingEvidence && <EvidenceForm operation={operation} tranche={tranche} locked={locked} feedback={chain.feedback} onReady={(items, note) =>
           open({ kind: 'evidence', items, note }, 'Presentar documentos', 'El comprador recibirá estos documentos para revisar la condición.', 'Documentos presentados. El comprador ya puede revisarlos.')} />}
       </div>
-      <section className="section action-section">
-        <h2>{settlement.state === 'shared' ? 'Reparto confirmado' : state}</h2>
-        {settlement.state !== 'shared' && <Amount cents={settlement.amount} />}
+      <section className="section action-section" aria-labelledby="condition-action-title">
+        <h2 id="condition-action-title">{isResolved ? settlementTitle : state}</h2>
+        {!isResolved && settlement.state !== 'shared' && <Amount cents={settlement.amount} />}
         <dl className="details">
           {!isResolved && <div><dt>Fecha límite</dt><dd>{formatDate(tranche.dueAt, true)}</dd></div>}
           {isResolved && <>
-            {settlement.state === 'shared' && <><div><dt>Entregado al desarrollador</dt><dd>{money(settlement.seller)}</dd></div>
-              <div><dt>Devuelto al comprador</dt><dd>{money(settlement.buyer)}</dd></div></>}
             <div><dt>Importe del tramo</dt><dd>{money(gross)}</dd></div>
-            {!!tranche.fee && <div><dt>Comisiones</dt><dd>{money(tranche.fee)}</dd></div>}</>}
+            <div><dt>Comisiones descontadas</dt><dd>{tranche.fee == null ? 'Sin registro' : (tranche.fee > 0 ? '−' : '') + money(tranche.fee)}</dd></div>
+            {(settlement.state === 'delivered' || settlement.state === 'shared') && <div className="settlement-net">
+              <dt>Entregado al desarrollador</dt><dd>{money(settlement.state === 'shared' ? settlement.seller : settlement.amount)}</dd>
+            </div>}
+            {(settlement.state === 'returned' || settlement.state === 'shared') && <div className="settlement-net">
+              <dt>Devuelto al comprador</dt><dd>{money(settlement.state === 'shared' ? settlement.buyer : settlement.amount)}</dd>
+            </div>}
+          </>}
         </dl>
-        <ExplorerLink base={session.data?.config.explorerUrl} hash={tranche.txHash} />
+        <ExplorerLink base={session.data?.config.explorerUrl} hash={tranche.txHash}>{isResolved ? settlementReceipt : undefined}</ExplorerLink>
         {tranche.pendingAction?.status === 'pending' && <Loading>Confirmando…</Loading>}
         {((action && !(esquoraResolution && action === 'resolve')) || form === 'dispute') &&
           action !== 'refund-response' && !signer && <ReconnectLink />}

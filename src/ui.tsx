@@ -54,9 +54,9 @@ export function ActionLink({ to, children, fixed = false }: { to: string; childr
   return fixed ? <div className="context-action">{link}</div> : link
 }
 
-export function TotalsStrip({ totals, showProtected = true }: { totals: Totals; showProtected?: boolean }) {
-  return <dl className={'totals-strip' + (showProtected ? '' : ' totals-strip-settled')}>
-    {showProtected && <div><dt><i className="swatch held" aria-hidden="true" />Protegido</dt><dd>{money(totals.held)}</dd></div>}
+export function TotalsStrip({ totals }: { totals: Totals }) {
+  return <dl className="totals-strip">
+    <div><dt><i className="swatch held" aria-hidden="true" />Protegido</dt><dd>{money(totals.held)}</dd></div>
     <div><dt><i className="swatch delivered" aria-hidden="true" />Entregado al desarrollador</dt><dd>{money(totals.released)}</dd></div>
     <div><dt><i className="swatch returned" aria-hidden="true" />Devuelto</dt><dd>{money(totals.refunded)}</dd></div>
   </dl>

@@ -1,15 +1,33 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { ArrowDownLeft, ArrowRight, ArrowUpRight, ShieldCheck } from 'lucide-react'
-import { Link, useParams } from 'react-router'
+import { Link, useParams, useSearchParams } from 'react-router'
 import { conditionPath, operationPath, read, readOperation, useSession, write, type Notification, type Receipt, type Verification, type Wallet } from './api.ts'
 import { amountInCents, eventLabels, formatDate, money } from './model.ts'
 import { ReconnectLink, useChainAction, useSigningAvailable } from './signing.tsx'
 import { ActionLink, Amount, Back, Empty, ExplorerLink, Feedback, Field, Loading, RowLink, Submit, Title, TotalsStrip, useWork } from './ui.tsx'
 
+function WalletRefund({ operationId }: { operationId: string }) {
+  const operation = readOperation(operationId)
+  if (operation.isPending) return <Loading>Consultando la devolución…</Loading>
+  if (operation.isError) return <Feedback error={operation.error} onRetry={() => void operation.refetch()} />
+  const { role, totals, unit, project } = operation.data
+  if (role !== 'buyer' || totals.refunded <= 0) return null
+
+  return <section className="wallet-refund" aria-labelledby="wallet-refund-title">
+    <div>
+      <h2 id="wallet-refund-title">Devolución de esta compra</h2>
+      <p className="muted">{project.name} · {unit}</p>
+    </div>
+    <strong>{money(totals.refunded)}</strong>
+    <Link className="text-link" to={operationPath(operationId)}>Ver compra</Link>
+  </section>
+}
+
 export function WalletPage() {
   const session = useSession()
   const wallet = read<Wallet>('/wallet')
+  const [params] = useSearchParams()
   const task = useWork()
   const chain = useChainAction()
   const available = useSigningAvailable()
@@ -17,6 +35,7 @@ export function WalletPage() {
   const [withdraw, setWithdraw] = useState(false)
   const config = session.data?.config
   const user = session.data?.user
+  const refundOperation = user?.kind === 'buyer' ? params.get('devolucion') : null
   if (wallet.isPending) return <Loading>Consultando tu saldo…</Loading>
   if (wallet.isError) return <Feedback error={wallet.error} onRetry={() => void wallet.refetch()} />
   const data = wallet.data
@@ -28,6 +47,7 @@ export function WalletPage() {
 
   return <>
     <Title>Mi saldo</Title>
+    {refundOperation && <WalletRefund operationId={refundOperation} />}
     <div className="two-column">
       <section className="section wallet-balance">
         <h2>Disponible para retirar</h2>
