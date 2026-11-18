@@ -1,6 +1,7 @@
 // Reglas del negocio, expedientes y registro de actividad.
 
 import { createHash } from 'node:crypto'
+import { netAfterFees } from '../shared/fees.ts'
 import { APP_URL, TW_FEE_BPS } from './config.ts'
 import { all, get, now, run } from './db.ts'
 import { ADDRESSES, centsToAmount } from './stellar.ts'
@@ -216,7 +217,7 @@ export function refundWindowPassed(op: OpRow, t: TrancheRow) {
   return Date.now() > Date.parse(t.refund_requested_at) + op.refund_response_hours * 3600_000
 }
 
-export const feeFor = (op: OpRow, grossCents: number) => Math.round((grossCents * (op.fee_bps + TW_FEE_BPS)) / 10_000)
+export const feeFor = (op: OpRow, grossCents: number) => grossCents - netAfterFees(grossCents, op.fee_bps)
 
 // ───────────────────────── Acuerdo ─────────────────────────
 

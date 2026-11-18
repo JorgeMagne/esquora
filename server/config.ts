@@ -28,7 +28,7 @@ export const POLLAR_SECRET_KEY = process.env.POLLAR_SECRET_KEY ?? ''
 export const POLLAR_SERVER_URL = (process.env.POLLAR_SERVER_URL ?? 'https://server.api.pollar.xyz').replace(/\/$/, '')
 
 export const PLATFORM_FEE_BPS = Number(process.env.PLATFORM_FEE_BPS ?? 90)
-export const TW_FEE_BPS = 30
+export { TW_FEE_BPS } from '../shared/fees.ts'
 export const BOB_PER_USDC = Number(process.env.ANCHOR_BOB_PER_USDC ?? 6.96)
 export const ANCHOR_INITIAL_CENTS = Number(process.env.ANCHOR_INITIAL_CENTS ?? 1_200_000)
 export const APP_URL = new URL(process.env.APP_URL ?? 'http://localhost:5173').origin

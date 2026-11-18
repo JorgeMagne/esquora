@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { amountInCents, boliviaDateTime, conditionAmounts, money, nextConditionAction, towerStage, trancheNet } from './model.ts'
+import { netAfterFees } from '../shared/fees.ts'
+import { amountInCents, boliviaDateTime, conditionAmounts, money, nextConditionAction, towerStage } from './model.ts'
 
 test('conserva centavos y rechaza importes con más de dos decimales', () => {
   assert.equal(amountInCents('6000,05'), 600005)
@@ -21,8 +22,13 @@ test('el reembolso vence antes de abrir el desacuerdo y se resuelve por el terce
   assert.equal(nextConditionAction('seller', { status: 'approved', overdue: true }), 'release')
 })
 
-test('distingue monto neto de los costos de la condición', () => {
-  assert.deepEqual(trancheNet(600000, 90), { platform: 5400, provider: 1800, net: 592800 })
+test('descuenta ambas comisiones del monto de la condición', () => {
+  assert.equal(netAfterFees(600000, 90), 592800)
+})
+
+test('redondea el neto después de aplicar ambas comisiones', () => {
+  assert.equal(netAfterFees(500, 90), 494)
+  assert.equal(netAfterFees(125, 90), 124)
 })
 
 test('visualiza los netos de un reparto y mantiene los importes íntegros en condiciones protegidas', () => {

@@ -62,12 +62,6 @@ export function boliviaDateTime(value: string) {
   return new Date(value + ':00-04:00').toISOString()
 }
 
-export function trancheNet(amount: number, platformBps: number) {
-  const platform = Math.round(amount * platformBps / 10000)
-  const provider = Math.round(amount * 30 / 10000)
-  return { platform, provider, net: amount - platform - provider }
-}
-
 export const operationLabels: Record<string, string> = {
   draft: 'Borrador', invited: 'Acuerdo por aceptar', deploying: 'Confirmando acuerdo',
   awaiting_deposit: 'Por depositar', funded: 'Con dinero protegido', closed: 'Finalizada',

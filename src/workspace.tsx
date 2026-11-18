@@ -2,11 +2,12 @@ import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { ArrowRight, Plus, Trash2 } from 'lucide-react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router'
+import { netAfterFees } from '../shared/fees.ts'
 import {
   invitationPath, operationPath, projectPath, read, uploadFile, write, type Invitation, type Operation,
   type OperationSummary, type Party, type Project, type ProjectDetail, type User,
 } from './api.ts'
-import { amountInCents, boliviaDateTime, conditions, formatDate, money, operationLabels, trancheNet } from './model.ts'
+import { amountInCents, boliviaDateTime, conditions, formatDate, money, operationLabels } from './model.ts'
 import { useSession } from './session.tsx'
 import { ActionLink, Amount, Back, Empty, Feedback, Field, FileRow, Loading, RowLink, Submit, Title, TotalsStrip, Tower, useWork } from './ui.tsx'
 
@@ -44,7 +45,7 @@ function DeveloperHome() {
   const actions = operations.data?.filter((operation) => operation.todo).slice(0, 8)
   const receivable = operations.data?.reduce((total, operation) => total + operation.tranches.filter((tranche) => tranche.status === 'approved')
     .reduce((approved, tranche) => approved + (tranche.feeEstimate === undefined ?
-      trancheNet(tranche.amount, platformFee).net : tranche.amount - tranche.feeEstimate), 0), 0)
+      netAfterFees(tranche.amount, platformFee) : tranche.amount - tranche.feeEstimate), 0), 0)
   return <>
     <Title action={<Link className="button primary" to="/proyectos/nuevo"><Plus size={18} aria-hidden="true" />Nuevo proyecto</Link>}>Proyectos</Title>
     {projects.isPending && <Loading>Cargando proyectos…</Loading>}

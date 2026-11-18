@@ -2,15 +2,18 @@ import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { ArrowRight, Check, Copy } from 'lucide-react'
 import { Link, useNavigate, useParams } from 'react-router'
+import { netAfterFees, TW_FEE_BPS } from '../shared/fees.ts'
 import {
   conditionPath, invitationPath, operationPath, paymentPath, read, readOperation, uploadFile, write,
   type ActionInput, type DepositOrder, type Evidence, type Operation, type ProjectDetail, type Tranche,
 } from './api.ts'
-import { amountInCents, conditionAmounts, conditionLabels, formatDate, money, nextConditionAction, numberAmount, operationLabels, requirementGuide, towerStage, trancheNet } from './model.ts'
+import { amountInCents, conditionAmounts, conditionLabels, formatDate, money, nextConditionAction, numberAmount, operationLabels, requirementGuide, towerStage } from './model.ts'
 import { useSession } from './session.tsx'
 import { ReconnectLink, useAgreementSignature, useChainAction, useSigningAvailable } from './signing.tsx'
 import type { ActionPrompt } from './signing.tsx'
 import { ActionLink, Amount, Back, Dialog, ExplorerLink, Feedback, Field, FileRow, Loading, Submit, Title, TotalsStrip, Tower, useWork } from './ui.tsx'
+
+const percent = new Intl.NumberFormat('es-BO', { style: 'percent', maximumFractionDigits: 2 })
 
 function conditionState(tranche: Tranche) {
   if (tranche.pendingAction?.status === 'pending') return 'Confirmando'
@@ -119,10 +122,7 @@ function Agreement({ operation, fromOperation = false }: { operation: Operation;
   const canAccept = role === 'buyer' && status === 'invited'
   const canSend = role === 'seller' && status === 'draft'
   const inviteUrl = operation.inviteToken && new URL(invitationPath(operation.inviteToken), window.location.origin).href
-  const costs = tranches.reduce((total, tranche) => {
-    const cost = trancheNet(tranche.amount, operation.feeBps)
-    return { platform: total.platform + cost.platform, provider: total.provider + cost.provider }
-  }, { platform: 0, provider: 0 })
+  const fees = tranches.reduce((total, { amount }) => total + amount - netAfterFees(amount, operation.feeBps), 0)
 
   async function refresh() {
     await query.invalidateQueries({ predicate: ({ queryKey }) => queryKey[0] === route || queryKey[0] === '/ops' || String(queryKey[0]).startsWith('/projects') })
@@ -169,8 +169,9 @@ function Agreement({ operation, fromOperation = false }: { operation: Operation;
         <h2>Cuota inicial protegida</h2>
         <Amount cents={deposit} />
         <dl className="details">
-          <div><dt>Comisión de ESQUORA</dt><dd>{money(costs.platform)}</dd></div>
-          <div><dt>Comisión de la red de protección</dt><dd>{money(costs.provider)}</dd></div>
+          <div><dt>Comisión de ESQUORA</dt><dd>{percent.format(operation.feeBps / 10_000)}</dd></div>
+          <div><dt>Comisión de la red de protección</dt><dd>{percent.format(TW_FEE_BPS / 10_000)}</dd></div>
+          <div><dt>Comisiones estimadas</dt><dd>{money(fees)}</dd></div>
         </dl>
         <p className="muted">Las comisiones se descuentan cuando se entrega o se devuelve cada tramo.</p>
         <Feedback error={task.error || (operation.deploymentError ? 'No pudimos registrar la protección. Vuelve a confirmar el acuerdo.' : null)}>
@@ -246,7 +247,7 @@ function ConditionDetail({ operation, tranche }: { operation: Operation; tranche
   const gross = tranche.amount
   const locked = chain.busy || tranche.pendingAction?.status === 'pending'
   const action = operation.status === 'funded' && !locked ? nextConditionAction(role, tranche) : null
-  const estimate = trancheNet(gross, feeBps)
+  const net = netAfterFees(gross, feeBps)
   const isResolved = ['released', 'refunded', 'resolved'].includes(tranche.status)
   const canDispute = operation.status === 'funded' && role !== 'arbiter' && !locked && ['submitted', 'objected', 'approved'].includes(tranche.status)
   const responseDeadline = tranche.refundResponseDueAt ?? (tranche.refundRequestedAt ?
@@ -322,10 +323,10 @@ function ConditionDetail({ operation, tranche }: { operation: Operation; tranche
         </>}
         {action === 'release' && signer && <button className="button primary" type="button" onClick={() =>
           open({ kind: 'release' }, 'Recibir pago aprobado',
-            'Se entregarán ' + money(estimate.net) + ' después de descontar las comisiones de esta condición.', 'Pago entregado.')}>
+            'Se entregarán ' + money(net) + ' después de descontar las comisiones de esta condición.', 'Pago entregado.')}>
           Recibir pago aprobado<ArrowRight size={18} aria-hidden="true" /></button>}
         {action === 'refund' && signer && <>
-          <p>Siguen protegidos {money(gross)}. Si la devolución se ejecuta por el monto completo, recibirás {money(estimate.net)} después de comisiones.</p>
+          <p>Siguen protegidos {money(gross)}. Si la devolución se ejecuta por el monto completo, recibirás {money(net)} después de comisiones.</p>
           <button className="button primary" type="button" onClick={() => open({ kind: 'refund' }, 'Pedir devolución',
             'El importe seguirá protegido mientras el desarrollador responde y el tercero designado resuelve.', 'Devolución solicitada.')} >
             Pedir devolución<ArrowRight size={18} aria-hidden="true" /></button>

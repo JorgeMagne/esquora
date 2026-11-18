@@ -6,6 +6,7 @@ COPY index.html vite.config.ts tsconfig.json ./
 COPY public ./public
 COPY src ./src
 COPY server ./server
+COPY shared ./shared
 COPY scripts ./scripts
 ARG VITE_POLLAR_PUBLISHABLE_KEY
 ENV VITE_POLLAR_PUBLISHABLE_KEY=$VITE_POLLAR_PUBLISHABLE_KEY
@@ -17,6 +18,7 @@ ENV NODE_ENV=production PORT=8787 DATA_DIR=/app/data
 COPY --from=build /app/package.json ./
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/server ./server
+COPY --from=build /app/shared ./shared
 COPY --from=build /app/dist ./dist
 RUN mkdir -p /app/data && chown node:node /app/data
 USER node
