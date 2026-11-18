@@ -1,0 +1,28 @@
+.resolution-instruction {
+  margin-block: 22px 12px;
+  padding-block-start: 18px;
+  border-block-start: 1px solid var(--control-line);
+}
+
+.resolution-instruction .details {
+  margin: 0;
+}
+
+.resolution-instruction > :is(h3, p) {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.resolution-instruction .resolution-attestation {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+}
+
+.resolution-attestation input {
+  inline-size: 1.15rem;
+  block-size: 1.15rem;
+  margin: 0.15em 0 0;
+  accent-color: var(--blue);
+}

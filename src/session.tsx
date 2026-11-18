@@ -161,7 +161,8 @@ export function Account({ user }: { user: User }) {
   const logout = useWork()
   const [params] = useSearchParams()
   const destination = safeReturn(params.get('volver'))
-  const [kind, setKind] = useState(user.kind || (destination.startsWith('/invitacion/') ? 'buyer' : ''))
+  const [kind, setKind] = useState(user.kind || (user.esquoraVerifier || destination.startsWith('/tercero/') ?
+    'arbiter' : destination.startsWith('/invitacion/') ? 'buyer' : ''))
   const [saved, setSaved] = useState(false)
   const [activationMessage, setActivationMessage] = useState('')
   const query = useQueryClient()
@@ -203,7 +204,11 @@ export function Account({ user }: { user: User }) {
           query.setQueryData<Session>(sessionKey, (previous) => previous ? { ...previous, user: updated.user } : previous)
           setSaved(true)
         })}>
-          {!user.kind && <Field label="Tipo de cuenta"><select name="kind" required value={kind} onChange={(event) => setKind(event.target.value)}>
+          {!user.kind && user.esquoraVerifier && <>
+            <input type="hidden" name="kind" value="arbiter" />
+            <p>Esta cuenta está designada para verificar y ejecutar resoluciones de ESQUORA.</p>
+          </>}
+          {!user.kind && !user.esquoraVerifier && <Field label="Tipo de cuenta"><select name="kind" required value={kind} onChange={(event) => setKind(event.target.value)}>
             <option value="">Selecciona una opción</option>
             {Object.entries(roleNames).map(([value, label]) => <option value={value} key={value}>{label}</option>)}
           </select></Field>}

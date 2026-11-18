@@ -14,6 +14,7 @@ const Login = lazy(() => import('./session.tsx').then((module) => ({ default: mo
 const Account = lazy(() => import('./session.tsx').then((module) => ({ default: module.Account })))
 const Home = lazy(() => import('./workspace.tsx').then((module) => ({ default: module.Home })))
 const InvitationPage = lazy(() => import('./workspace.tsx').then((module) => ({ default: module.InvitationPage })))
+const ResolverInvitationPage = lazy(() => import('./workspace.tsx').then((module) => ({ default: module.ResolverInvitationPage })))
 const ProjectNew = lazy(() => import('./workspace.tsx').then((module) => ({ default: module.ProjectNew })))
 const ProjectPage = lazy(() => import('./workspace.tsx').then((module) => ({ default: module.ProjectPage })))
 const OperationNew = lazy(() => import('./workspace.tsx').then((module) => ({ default: module.OperationNew })))
@@ -48,6 +49,7 @@ function LiveUpdates({ userId }: { userId: string }) {
           void query.invalidateQueries({ predicate: ({ queryKey }) => {
             const path = String(queryKey[0])
             return path === '/ops' || path.startsWith('/projects') || path === '/notifications' ||
+              (path.startsWith('/tranches/') && path.endsWith('/resolution-instruction')) ||
               path === '/ops/' + update.id || path === '/ops/' + update.id + '/verification'
           } })
         }
@@ -160,6 +162,7 @@ function App() {
     <Route path="*" element={<Shell user={user}>
       <Routes>
         <Route path="/invitacion/:token" element={<InvitationPage />} />
+        <Route path="/tercero/:token" element={<ResolverInvitationPage />} />
         <Route path="/" element={user ? <Protected user={user}><SessionNotice user={user} /><Home user={user} /></Protected> :
           <PollarSession><Login /></PollarSession>} />
         <Route element={<PollarSession><Outlet /></PollarSession>}>

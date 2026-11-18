@@ -5,12 +5,14 @@ import { Link, useNavigate, useParams } from 'react-router'
 import { canOpenConditionDispute } from '../shared/conditions.ts'
 import { netAfterFees, TW_FEE_BPS } from '../shared/fees.ts'
 import {
-  conditionPath, invitationPath, operationPath, paymentPath, read, readOperation, uploadFile, useSession, write,
-  type ActionInput, type DepositOrder, type Evidence, type Operation, type ProjectDetail, type Tranche,
+  conditionPath, invitationPath, operationPath, paymentPath, read, readOperation, resolverInvitationPath, uploadFile, useSession, write,
+  type ActionInput, type DepositOrder, type Evidence, type Operation, type ProjectDetail, type ResolutionMode, type Tranche,
 } from './api.ts'
 import { amountInCents, conditionAmounts, conditionLabels, formatDate, money, nextConditionAction, numberAmount, operationLabels, requirementGuide, towerStage } from './model.ts'
 import { ReconnectLink, useAgreementSignature, useChainAction, useSigningAvailable } from './signing.tsx'
 import type { ActionPrompt } from './signing.tsx'
+import { ResolverOptions } from './resolver-options.tsx'
+import { ResolutionInstruction } from './resolution.tsx'
 import { ActionLink, Amount, Back, Dialog, ExplorerLink, Feedback, Field, FileRow, Loading, Submit, Title, TotalsStrip, Tower, useWork } from './ui.tsx'
 
 const percent = new Intl.NumberFormat('es-BO', { style: 'percent', maximumFractionDigits: 2 })
@@ -29,7 +31,7 @@ function conditionState(tranche: Tranche) {
 function conditionButton(operation: Operation, tranche: Tranche) {
   const action = nextConditionAction(operation.role, tranche)
   if (action === 'evidence') return 'Presentar documentos'
-  if (action === 'approve') return tranche.idx === 1 ? 'Revisar inicio de obra' : 'Revisar documentos'
+  if (action === 'approve') return tranche.title === 'Inicio de obra' ? 'Revisar inicio de obra' : 'Revisar documentos'
   if (action === 'release') return 'Recibir pago aprobado'
   if (action === 'refund') return 'Pedir devolución'
   if (action === 'refund-response') return 'Responder devolución'
@@ -142,11 +144,19 @@ function Agreement({ operation, fromOperation = false }: { operation: Operation;
   const user = useSession().data?.user
   const task = useWork()
   const [dialog, setDialog] = useState<'accept' | 'send' | 'cancel' | 'decline' | null>(null)
-  const [copied, setCopied] = useState(false)
   const [note, setNote] = useState('')
+  const [resolutionConsent, setResolutionConsent] = useState(false)
+  const [unsavedResolver, setUnsavedResolver] = useState<string | null>(null)
   const route = '/ops/' + id
   const canAccept = role === 'buyer' && status === 'invited'
-  const canSend = role === 'seller' && status === 'draft'
+  const sellerDraft = role === 'seller' && status === 'draft'
+  const resolutionMode = operation.resolutionMode ?? (arbiter ? 'external' : 'pending')
+  const resolverReady = operation.resolverReady ?? !!arbiter
+  const resolverKey = id + ':' + resolutionMode + ':' + (operation.arbiterEmail ?? '')
+  const resolverChanged = unsavedResolver === resolverKey
+  const canSend = sellerDraft && resolverReady && !resolverChanged
+  const resolutionTerms = operation.resolutionTerms
+  const requiresConsent = resolutionMode === 'esquora'
   const inviteUrl = operation.inviteToken && new URL(invitationPath(operation.inviteToken), window.location.origin).href
   const fees = tranches.reduce((total, { amount }) => total + amount - netAfterFees(amount, operation.feeBps), 0)
 
@@ -155,7 +165,9 @@ function Agreement({ operation, fromOperation = false }: { operation: Operation;
   }
 
   async function saveAgreement(action: 'accept' | 'send' | 'cancel' | 'decline') {
-    const body = action === 'accept' || action === 'send' ? { signature: await signAgreement(operation.termsDigest) } :
+    const signing = action === 'accept' || action === 'send'
+    if (signing && requiresConsent && (!resolutionConsent || !resolutionTerms)) throw new Error('Acepta las condiciones de verificación y ejecución antes de continuar.')
+    const body = signing ? { signature: await signAgreement(operation.termsDigest), ...(requiresConsent && { resolutionConsent }) } :
       action === 'decline' ? { reason: note } : {}
     const updated = await write<Operation>(route + '/' + action, body)
     query.setQueryData([route], updated)
@@ -175,12 +187,26 @@ function Agreement({ operation, fromOperation = false }: { operation: Operation;
             <div><dt>Desarrollador</dt><dd>{seller.orgName ?? seller.name}</dd></div>
             <div><dt>Comprador</dt><dd>{buyerName}</dd></div>
             <div><dt>Precio del inmueble</dt><dd>{money(operation.price)}</dd></div>
-            <div><dt>Tercero designado</dt><dd>{arbiter.orgName ?? arbiter.name}</dd></div>
+            <div><dt>Modalidad de resolución</dt><dd>{resolutionMode === 'esquora' ? 'ESQUORA verifica y ejecuta' :
+              resolutionMode === 'external' ? arbiter?.orgName ?? arbiter?.name ?? 'Tercero invitado' : 'Por elegir'}</dd></div>
             <div><dt>Plazo para responder una devolución</dt><dd>{operation.refundResponseHours < 1 ?
               Math.round(operation.refundResponseHours * 60) + ' min' : operation.refundResponseHours + ' h'}</dd></div>
           </dl>
           {contract && <FileRow file={contract} label="Descargar el contrato" detail={contract.name} />}
         </section>
+        {sellerDraft && <DraftResolver
+          key={resolverKey}
+          operation={operation} mode={resolutionMode} ready={resolverReady}
+          onChange={(changed) => setUnsavedResolver(changed ? resolverKey : null)}
+          onUpdate={(updated) => {
+            setUnsavedResolver(null)
+            query.setQueryData([route], updated)
+            void refresh()
+          }} />}
+        {requiresConsent && resolutionTerms && <section className="section" aria-label={resolutionTerms.title}>
+          <h2>{resolutionTerms.title}</h2>
+          <ol className="plain-list resolution-clauses">{resolutionTerms.clauses.map((clause, index) => <li key={index}>{clause}</li>)}</ol>
+        </section>}
         <section className="section">
           <h2>Condiciones</h2>
           {tranches.map((tranche) => <details className="disclosure" key={tranche.id}>
@@ -204,19 +230,16 @@ function Agreement({ operation, fromOperation = false }: { operation: Operation;
         </Feedback>
         {status === 'deploying' && <Loading>Confirmando el acuerdo…</Loading>}
         {operation.depositOrder?.status === 'paid' && <Loading>Confirmando el depósito…</Loading>}
+        {sellerDraft && resolverChanged && <p className="muted">Guarda el cambio de resolución antes de enviar el acuerdo.</p>}
         {canAccept && user?.walletStatus !== 'active' && <ActionLink to={'/cuenta?volver=' + encodeURIComponent(operationPath(id))}>Activar mi cuenta</ActionLink>}
         {(canSend || (canAccept && user?.walletStatus === 'active')) && (canSign ?
-          <button className="button primary" type="button" disabled={task.busy} onClick={() => setDialog(canSend ? 'send' : 'accept')}>
+          <button className="button primary" type="button" disabled={task.busy || (requiresConsent && !resolutionTerms)}
+            onClick={() => { setResolutionConsent(false); setDialog(canSend ? 'send' : 'accept') }}>
             {task.busy ? 'Confirmando…' : canSend ? 'Enviar invitación' : 'Aceptar acuerdo'}<ArrowRight size={18} aria-hidden="true" />
           </button> : <ReconnectLink />)}
         {canAccept && <button className="text-button" type="button" disabled={task.busy} onClick={() => setDialog('decline')}>Rechazar acuerdo</button>}
         {role === 'buyer' && status === 'awaiting_deposit' && <ActionLink to={operationPath(id)}>Ir a la cuota inicial</ActionLink>}
-        {role === 'seller' && status === 'invited' && inviteUrl && <div className="stack invite-share">
-          <Field label="Enlace de invitación"><input value={inviteUrl} readOnly onFocus={(event) => event.currentTarget.select()} /></Field>
-          <button type="button" className="button secondary" onClick={() => void task.run(async () => { await navigator.clipboard.writeText(inviteUrl); setCopied(true) })}>
-            {copied ? 'Enlace copiado' : 'Copiar enlace'}{copied ? <Check size={16} aria-hidden="true" /> : <Copy size={16} aria-hidden="true" />}
-          </button>
-        </div>}
+        {role === 'seller' && status === 'invited' && inviteUrl && <InviteShare url={inviteUrl} label="Enlace para el comprador" />}
         {role === 'seller' && ['draft', 'invited'].includes(status) &&
           <button className="text-button" type="button" disabled={task.busy} onClick={() => setDialog('cancel')}>Retirar acuerdo</button>}
       </section>
@@ -229,16 +252,77 @@ function Agreement({ operation, fromOperation = false }: { operation: Operation;
         setDialog(null)
         void task.run(() => saveAgreement(action))
       }}>
-        {dialog === 'accept' && <p>Confirmas la cuota inicial, las condiciones, los plazos y el tercero designado del acuerdo.</p>}
+        {dialog === 'accept' && <p>Confirmas la cuota inicial, las condiciones, los plazos y cómo se tramitará una devolución o un desacuerdo.</p>}
         {dialog === 'send' && <p>Confirmas los datos de la preventa y habilitas el enlace de invitación para el comprador.</p>}
         {dialog === 'cancel' && <p>El acuerdo se retirará y el comprador dejará de tener acceso a la invitación.</p>}
         {dialog === 'decline' && <Field label="Motivo del rechazo"><textarea value={note} onChange={(event) => setNote(event.target.value)} maxLength={600} required /></Field>}
+        {requiresConsent && (dialog === 'accept' || dialog === 'send') && <label className="resolution-consent">
+          <input type="checkbox" checked={resolutionConsent} required onChange={(event) => setResolutionConsent(event.target.checked)} />
+          <span>Leí y acepto las condiciones de verificación y ejecución de ESQUORA.</span>
+        </label>}
         <div className="button-row">
           <button className="button secondary" type="button" onClick={() => setDialog(null)}>Volver</button><Submit>Confirmar</Submit>
         </div>
       </form>
     </Dialog>}
   </>
+}
+
+function DraftResolver({ operation, mode: savedMode, ready, onChange, onUpdate }: {
+  operation: Operation; mode: ResolutionMode; ready: boolean;
+  onChange: (changed: boolean) => void; onUpdate: (operation: Operation) => void;
+}) {
+  const [mode, setMode] = useState(savedMode)
+  const [email, setEmail] = useState(operation.arbiterEmail ?? '')
+  const task = useWork()
+  const pendingInvite = savedMode === 'external' && !ready && operation.arbiterInviteToken
+  const isChanged = (selected: ResolutionMode, selectedEmail: string) => selected !== savedMode ||
+    (selected === 'external' && selectedEmail.trim() !== (operation.arbiterEmail ?? ''))
+  const changed = isChanged(mode, email)
+  const refreshEsquora = mode === 'esquora' && savedMode === 'esquora' && !ready
+
+  return <section className="section">
+    <h2>Resolución del acuerdo</h2>
+    <form className="stack" onSubmit={task.submit(async () => {
+      const updated = await write<Operation>('/ops/' + operation.id + '/resolver', {
+        resolutionMode: mode, ...(mode === 'external' && { arbiterEmail: email.trim() }),
+      }, 'PATCH')
+      onUpdate(updated)
+    })}>
+      <ResolverOptions mode={mode} email={email} onMode={(selected) => {
+        setMode(selected)
+        onChange(isChanged(selected, email))
+      }} onEmail={(selected) => {
+        setEmail(selected)
+        onChange(isChanged(mode, selected))
+      }} />
+      <Feedback error={task.error} />
+      <button className="button secondary" type="submit" disabled={task.busy || (!changed && !refreshEsquora)}>
+        {task.busy ? 'Guardando…' : refreshEsquora ? 'Comprobar disponibilidad' : 'Guardar resolución'}
+      </button>
+    </form>
+    {pendingInvite && <>
+      <p className="muted">Comparte este enlace con {operation.arbiterEmail || 'el tercero'}. Podrás enviar el acuerdo cuando acepte.</p>
+      <InviteShare url={new URL(resolverInvitationPath(pendingInvite), window.location.origin).href} label="Enlace para el tercero designado" />
+    </>}
+    {ready && savedMode === 'external' && <p>El tercero aceptó la designación.</p>}
+    {!ready && savedMode === 'esquora' && <p>La cuenta verificadora de ESQUORA está pendiente de activación. Puedes conservar el borrador o invitar a un tercero.</p>}
+  </section>
+}
+
+function InviteShare({ url, label }: { url: string; label: string }) {
+  const task = useWork()
+  const [copiedUrl, setCopiedUrl] = useState<string | null>(null)
+  const copied = copiedUrl === url
+  return <div className="stack invite-share">
+    <Field label={label}><input value={url} readOnly onFocus={(event) => event.currentTarget.select()} /></Field>
+    <Feedback error={task.error} />
+    <button type="button" className="button secondary" disabled={task.busy} onClick={() => void task.run(async () => {
+      try { await navigator.clipboard.writeText(url) }
+      catch { throw new Error('Selecciona el enlace del campo para copiarlo manualmente.') }
+      setCopiedUrl(url)
+    })}>{copied ? 'Enlace copiado' : 'Copiar enlace'}{copied ? <Check size={16} aria-hidden="true" /> : <Copy size={16} aria-hidden="true" />}</button>
+  </div>
 }
 
 export function ConditionPage() {
@@ -277,6 +361,8 @@ function ConditionDetail({ operation, tranche }: { operation: Operation; tranche
   const action = operation.status === 'funded' && !locked ? nextConditionAction(role, tranche) : null
   const net = netAfterFees(gross, feeBps)
   const isResolved = ['released', 'refunded', 'resolved'].includes(tranche.status)
+  const esquoraResolution = operation.resolutionMode === 'esquora' &&
+    ['disputed', 'refund_requested', 'refunded', 'resolved'].includes(tranche.status)
   const settlement = conditionAmounts(tranche)
   const canDispute = operation.status === 'funded' && role !== 'arbiter' && !locked && canOpenConditionDispute(tranche.status)
   const responseDeadline = tranche.refundResponseDueAt ?? (tranche.refundRequestedAt ?
@@ -298,7 +384,8 @@ function ConditionDetail({ operation, tranche }: { operation: Operation; tranche
           {tranche.requirements.map((requirement) => {
             const file = tranche.evidence.find((item) => item.reqKey === requirement.key)?.file
             const guide = requirementGuide.get(requirement.key)
-            const contractMatch = requirement.key === 'contrato_certificado' && file ? file.sha256 === operation.contractSha256 : null
+            const contractMatch = requirement.key === 'contrato_certificado' && file && operation.contractSha256 ?
+              file.sha256 === operation.contractSha256 : null
             const detail = contractMatch === null ? guide ?? file?.name : contractMatch ?
               'Coincide con el contrato del acuerdo.' : 'El archivo es diferente del contrato del acuerdo. Revísalo antes de confirmar.'
             return file ? <FileRow key={requirement.key} file={file} label={requirement.label} detail={detail} /> :
@@ -321,9 +408,10 @@ function ConditionDetail({ operation, tranche }: { operation: Operation; tranche
           {tranche.objection && <p><strong>Observación del comprador. </strong>{tranche.objection}</p>}
           {tranche.disputeReason && <p><strong>Motivo del {tranche.disputeByRole === 'seller' ? 'desarrollador' : 'comprador'}. </strong>{tranche.disputeReason}</p>}
           {tranche.refundRequestedAt && !tranche.refundResponse && !isResolved && <p>{tranche.refundWindowPassed ?
-            'El plazo de respuesta terminó. Le toca al tercero designado resolver.' :
+            'El plazo de respuesta terminó. ' + (esquoraResolution ? 'Las partes ya pueden presentar una instrucción.' : 'Le toca al tercero designado resolver.') :
             'El desarrollador puede responder hasta el ' + formatDate(responseDeadline, true) + ' (Bolivia).'}</p>}
-          {tranche.refundResponse && !isResolved && <p>El desarrollador {tranche.refundResponse === 'accepted' ? 'aceptó la devolución' : 'rechazó la devolución'}. Le toca al tercero designado.</p>}
+          {tranche.refundResponse && !isResolved && <p>El desarrollador {tranche.refundResponse === 'accepted' ? 'aceptó la devolución' : 'rechazó la devolución'}. {esquoraResolution ?
+            'Las partes ya pueden presentar una instrucción.' : 'Le toca al tercero designado.'}</p>}
           {tranche.refundResponseReason && <p>{tranche.refundResponseReason}</p>}
           <Link className="text-link" to={operationPath(id) + '/acuerdo'}>Consultar el acuerdo</Link>
         </section>}
@@ -343,7 +431,8 @@ function ConditionDetail({ operation, tranche }: { operation: Operation; tranche
         </dl>
         <ExplorerLink base={session.data?.config.explorerUrl} hash={tranche.txHash} />
         {tranche.pendingAction?.status === 'pending' && <Loading>Confirmando…</Loading>}
-        {(action || form === 'dispute') && action !== 'refund-response' && !signer && <ReconnectLink />}
+        {((action && !(esquoraResolution && action === 'resolve')) || form === 'dispute') &&
+          action !== 'refund-response' && !signer && <ReconnectLink />}
         {action === 'approve' && signer && <>
           <button className="button primary" type="button" onClick={() => open({ kind: 'approve' }, 'Confirmar la condición',
             'Esta confirmación es definitiva. El desarrollador podrá recibir el pago de esta condición.', 'Listo. El desarrollador ya puede recibir el pago.')}>
@@ -375,7 +464,8 @@ function ConditionDetail({ operation, tranche }: { operation: Operation; tranche
           </Field>
           <Submit waiting={task.busy}>Registrar respuesta</Submit>
         </form>}
-        {action === 'resolve' && signer && <form className="stack" onSubmit={task.submit(async () => {
+        {esquoraResolution && <ResolutionInstruction operation={operation} tranche={tranche} locked={locked} onReady={(prompt) => chain.open(prompt)} />}
+        {action === 'resolve' && signer && !esquoraResolution && <form className="stack" onSubmit={task.submit(async () => {
           if (buyerShare === null) throw new Error('Ingresa un importe válido para el comprador.')
           const sellerShare = gross - buyerShare
           open({ kind: 'resolve', toBuyer: buyerShare, toSeller: sellerShare, note: response }, 'Ejecutar la resolución',

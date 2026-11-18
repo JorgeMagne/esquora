@@ -1,13 +1,15 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { ArrowRight, Plus, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowRight, ArrowUp, Plus, Trash2 } from 'lucide-react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router'
 import { netAfterFees } from '../shared/fees.ts'
 import {
-  invitationPath, operationPath, projectPath, read, uploadFile, useSession, write, type Invitation, type Operation,
-  type OperationSummary, type Party, type Project, type ProjectDetail, type User,
+  invitationPath, operationPath, projectPath, read, resolverInvitationPath, uploadFile, useSession, write, type Invitation, type Operation,
+  type OperationSummary, type Project, type ProjectDetail, type ResolutionMode, type ResolverInvitation, type User,
 } from './api.ts'
-import { amountInCents, boliviaDateTime, conditions, formatDate, money, operationLabels } from './model.ts'
+import { amountInCents, conditions, formatDate, money, operationLabels } from './model.ts'
+import { amountsForDraft, buildDraftConditions, draftAmount, draftRequirement, emptyCondition, MAX_CONDITIONS, MAX_REQUIREMENTS, moveCondition, preventaTemplate, type DraftCondition } from './preventa-draft.ts'
+import { ResolverOptions } from './resolver-options.tsx'
 import { ActionLink, Amount, Back, Empty, Feedback, Field, FileRow, Loading, RowLink, Submit, Title, TotalsStrip, Tower, useWork } from './ui.tsx'
 
 export function Home({ user }: { user: User }) {
@@ -172,24 +174,19 @@ export function ProjectPage() {
 export function OperationNew() {
   const { id = '' } = useParams()
   const project = read<ProjectDetail>('/projects/' + id)
-  const arbiters = read<Party[]>('/arbiters')
   const user = useSession().data?.user
   const task = useWork()
   const navigate = useNavigate()
   const query = useQueryClient()
+  const [startingPoint, setStartingPoint] = useState<'template' | 'blank'>('template')
+  const [drafts, setDrafts] = useState(() => ({ template: preventaTemplate(), blank: [emptyCondition()] }))
   const [deposit, setDeposit] = useState('')
-  const [first, setFirst] = useState('')
-  const [autoSplit, setAutoSplit] = useState(true)
+  const [resolutionMode, setResolutionMode] = useState<ResolutionMode>('pending')
+  const [arbiterEmail, setArbiterEmail] = useState('')
   const nextPath = projectPath(id) + '/nueva-operacion'
-  const firstCents = parseOptional(first)
-  const depositCents = parseOptional(deposit)
-  const second = firstCents === null || depositCents === null ? null : depositCents - firstCents
 
-  if (project.isPending || arbiters.isPending) return <Loading>Preparando el acuerdo…</Loading>
-  if (project.isError || arbiters.isError) return <Feedback error={project.error ?? arbiters.error} onRetry={() => {
-    void project.refetch()
-    void arbiters.refetch()
-  }} />
+  if (project.isPending) return <Loading>Preparando el acuerdo…</Loading>
+  if (project.isError) return <Feedback error={project.error} onRetry={() => void project.refetch()} />
   if (user?.walletStatus !== 'active') return <>
     <Back to={projectPath(id)}>Volver al proyecto</Back>
     <Title>Nueva operación</Title>
@@ -203,22 +200,17 @@ export function OperationNew() {
     <form className="operation-form" onSubmit={task.submit(async (data) => {
       const initial = amountInCents(deposit)
       const price = amountInCents(String(data.get('price')))
-      const firstAmount = amountInCents(first)
       if (initial > price) throw new Error('La cuota inicial debe ser menor o igual al precio del inmueble.')
-      if (firstAmount >= initial) throw new Error('El primer tramo debe ser menor a la cuota inicial.')
-      const tranches = conditions.map((condition, index) => ({
-        title: condition.title, condition: condition.condition,
-        requirements: condition.requirements.map(({ key, label }) => ({ key, label })),
-        amount: index === 0 ? firstAmount : initial - firstAmount,
-        dueAt: boliviaDateTime(String(data.get('dueAt' + index))),
-      }))
-      if (tranches.some((tranche) => Date.parse(tranche.dueAt) <= Date.now())) throw new Error('Las fechas límite deben ser futuras. Las horas se interpretan en horario de Bolivia.')
+      const tranches = buildDraftConditions(drafts[startingPoint], initial)
       const contract = data.get('contract')
-      if (!(contract instanceof File) || !contract.size) throw new Error('Adjunta el contrato firmado.')
-      const file = await uploadFile(contract)
+      if (resolutionMode === 'external' && arbiterEmail.trim().toLowerCase() === String(data.get('buyerEmail')).trim().toLowerCase())
+        throw new Error('El comprador y el tercero designado deben usar correos diferentes.')
+      const file = contract instanceof File && contract.size > 0 ? await uploadFile(contract) : null
       const operation = await write<Operation>('/ops', {
         projectId: id, unit: data.get('unit'), unitDetail: data.get('unitDetail'), price, deposit: initial, buyerName: data.get('buyerName'),
-        buyerEmail: data.get('buyerEmail'), arbiterId: data.get('arbiterId'), contractFileId: file.id,
+        buyerEmail: data.get('buyerEmail'), resolutionMode,
+        ...(resolutionMode === 'external' && { arbiterEmail: arbiterEmail.trim() }),
+        ...(file && { contractFileId: file.id }),
         refundResponseHours: Number(data.get('refundResponse')) / (data.get('refundUnit') === 'minutes' ? 60 : 1), tranches,
       })
       query.setQueryData(['/ops/' + operation.id], operation)
@@ -232,44 +224,104 @@ export function OperationNew() {
         <Field label="Nombre del comprador"><input name="buyerName" required maxLength={120} /></Field>
         <Field label="Correo del comprador"><input name="buyerEmail" type="email" required maxLength={200} /></Field>
         <Field label="Precio del inmueble (USD)"><input name="price" inputMode="decimal" required /></Field>
-        <Field label="Cuota inicial (USD)"><input name="deposit" inputMode="decimal" required value={deposit} onChange={(event) => {
-          const value = event.target.value
-          setDeposit(value)
-          const cents = parseOptional(value)
-          if (autoSplit) setFirst(cents === null ? '' : String(Math.floor(cents / 2) / 100))
-        }} /></Field>
+        <Field label="Cuota inicial (USD)"><input name="deposit" inputMode="decimal" required value={deposit} onChange={(event) => setDeposit(event.target.value)} /></Field>
       </section>
       <section className="section form-grid">
         <h2 className="field-wide">Condiciones de la preventa</h2>
-        {conditions.map((condition, index) => <fieldset key={condition.title} className="condition-fieldset">
-          <legend>{condition.title}</legend>
-          <ul className="plain-list">{condition.requirements.map((requirement) => <li key={requirement.key}>{requirement.label}</li>)}</ul>
-          {index === 0 ? <Field label="Monto de la condición (USD)"><input name="firstAmount" inputMode="decimal" required
-            value={first} onChange={(event) => { setAutoSplit(false); setFirst(event.target.value) }} /></Field> :
-            <p className="field"><span>Monto de la condición</span><strong>{second !== null && second > 0 ? money(second) : '—'}</strong></p>}
-          <Field label="Fecha límite" help="Horario de Bolivia"><input name={'dueAt' + index} type="datetime-local" required /></Field>
-        </fieldset>)}
+        <Field label="Punto de partida" wide><select value={startingPoint} onChange={(event) => setStartingPoint(event.target.value === 'blank' ? 'blank' : 'template')}>
+          <option value="template">Plantilla de preventa</option><option value="blank">Empezar desde cero</option>
+        </select></Field>
+        <DraftConditions key={startingPoint} rows={drafts[startingPoint]} deposit={draftAmount(deposit)}
+          onChange={(rows) => setDrafts((previous) => ({ ...previous, [startingPoint]: rows }))} />
       </section>
       <section className="section form-grid">
-        <h2 className="field-wide">Contrato y tercero designado</h2>
-        <Field label="Contrato firmado" wide><input name="contract" type="file" accept=".pdf,.jpg,.jpeg,.png" required /></Field>
-        <Field label="Tercero designado"><select name="arbiterId" required>
-          <option value="">Selecciona al tercero</option>
-          {arbiters.data.map((party) => <option value={party.id} key={party.id}>{party.orgName ?? party.name}</option>)}
-        </select></Field>
+        <h2 className="field-wide">Contrato y resolución</h2>
+        <Field label="Contrato firmado (opcional)" wide><input name="contract" type="file" accept=".pdf,.jpg,.jpeg,.png" /></Field>
+        <div className="field-wide"><ResolverOptions mode={resolutionMode} email={arbiterEmail} onMode={setResolutionMode} onEmail={setArbiterEmail} /></div>
         <Field label="Plazo para responder una devolución"><input name="refundResponse" type="number" min={1} max={1440} defaultValue={72} required /></Field>
         <Field label="Unidad del plazo"><select name="refundUnit" defaultValue="hours">
           <option value="hours">Horas</option><option value="minutes">Minutos</option>
         </select></Field>
-        {!arbiters.data.length && <p className="field-wide">El tercero designado en el contrato debe registrarse y activar su cuenta para aparecer en la lista.</p>}
-        <div className="field-wide"><Feedback error={task.error} /><Submit waiting={task.busy} disabled={!arbiters.data.length}>Revisar acuerdo</Submit></div>
+        <div className="field-wide"><Feedback error={task.error} /><Submit waiting={task.busy}>Revisar acuerdo</Submit></div>
       </section>
     </form>
   </>
 }
 
-function parseOptional(value: string) {
-  try { return amountInCents(value) } catch { return null }
+function DraftConditions({ rows, deposit, onChange }: { rows: DraftCondition[]; deposit: number | null; onChange: (rows: DraftCondition[]) => void }) {
+  const amounts = amountsForDraft(rows, deposit)
+  const allocated = amounts.reduce<number>((sum, amount) => sum + (amount ?? 0), 0)
+  const [focus, setFocus] = useState<string | null>(null)
+  useEffect(() => {
+    if (!focus) return
+    document.getElementById(focus)?.focus()
+    setFocus(null)
+  }, [focus])
+
+  function update(index: number, changes: Partial<DraftCondition>) {
+    onChange(rows.map((row, position) => position === index ? { ...row, ...changes } : row))
+  }
+
+  return <div className="field-wide draft-conditions">
+    {rows.map((row, index) => {
+      const position = index + 1
+      const amount = amounts[index]
+      return <fieldset key={row.id} className="condition-fieldset draft-condition">
+        <legend>Condición {position}</legend>
+        <div className="condition-controls" aria-label={'Opciones de la condición ' + position} role="group">
+          <button className="icon-button" type="button" disabled={index === 0} aria-label={'Subir condición ' + position} title="Subir condición"
+            onClick={() => onChange(moveCondition(rows, index, -1))}><ArrowUp size={19} aria-hidden="true" /></button>
+          <button className="icon-button" type="button" disabled={position === rows.length} aria-label={'Bajar condición ' + position} title="Bajar condición"
+            onClick={() => onChange(moveCondition(rows, index, 1))}><ArrowDown size={19} aria-hidden="true" /></button>
+          <button className="icon-button" type="button" disabled={rows.length === 1} aria-label={'Quitar condición ' + position} title="Quitar condición"
+            onClick={() => { onChange(rows.filter((item) => item.id !== row.id)); setFocus('condition-' + (rows[index + 1] ?? rows[index - 1]).id) }}>
+            <Trash2 size={18} aria-hidden="true" />
+          </button>
+        </div>
+        <div className="form-grid">
+          <Field label="Nombre de la condición"><input id={'condition-' + row.id} value={row.title} maxLength={120} required
+            onChange={(event) => update(index, { title: event.target.value })} /></Field>
+          <Field label="Fecha límite" help="Horario de Bolivia"><input type="datetime-local" value={row.dueAt} required
+            onChange={(event) => update(index, { dueAt: event.target.value })} /></Field>
+          <Field label="Qué debe cumplirse" wide><textarea value={row.condition} maxLength={600} required
+            onChange={(event) => update(index, { condition: event.target.value })} /></Field>
+          <Field label="Monto de la condición (USD)" help={row.amount === null ? 'Se calcula con la cuota inicial y los montos que asignes.' : undefined}>
+            <input inputMode="decimal" value={row.amount ?? (amount === null ? '' : String(amount / 100))} required
+              onChange={(event) => update(index, { amount: event.target.value })} />
+          </Field>
+        </div>
+        {row.requirements.map((requirement, documentIndex) => <div key={requirement.key} className="requirement-edit">
+          <Field label={'Documento requerido ' + (documentIndex + 1)}>
+            <input id={requirement.key} value={requirement.label} maxLength={200} required onChange={(event) => {
+              const label = event.target.value
+              update(index, { requirements: row.requirements.map((item) => item.key === requirement.key ? { ...item, label } : item) })
+            }} />
+          </Field>
+          <button className="icon-button" type="button" disabled={row.requirements.length === 1}
+            aria-label={'Quitar documento ' + (documentIndex + 1) + ' de la condición ' + position} title="Quitar documento"
+            onClick={() => {
+              update(index, { requirements: row.requirements.filter((item) => item.key !== requirement.key) })
+              setFocus((row.requirements[documentIndex + 1] ?? row.requirements[documentIndex - 1]).key)
+            }}><Trash2 size={17} aria-hidden="true" /></button>
+        </div>)}
+        {row.requirements.length < MAX_REQUIREMENTS && <button className="text-button" type="button" onClick={() => {
+          const next = draftRequirement()
+          update(index, { requirements: [...row.requirements, next] })
+          setFocus(next.key)
+        }}><Plus size={16} aria-hidden="true" />Añadir documento</button>}
+      </fieldset>
+    })}
+    <div className="button-row">
+      {rows.length < MAX_CONDITIONS && <button className="button secondary" type="button" onClick={() => {
+        const row = emptyCondition()
+        onChange([...rows, row])
+        setFocus('condition-' + row.id)
+      }}><Plus size={18} aria-hidden="true" />Añadir condición</button>}
+      {rows.some((row) => row.amount !== null) && <button className="text-button" type="button"
+        onClick={() => onChange(rows.map((row) => ({ ...row, amount: null })))}>Repartir en partes iguales</button>}
+    </div>
+    {deposit !== null && <p className="draft-allocation" aria-live="polite">{money(allocated)} asignados de {money(deposit)}</p>}
+  </div>
 }
 
 export function InvitationPage() {
@@ -304,6 +356,53 @@ export function InvitationPage() {
                 await query.invalidateQueries({ queryKey: ['/ops'] })
                 navigate(operationPath(result.opId))
               })}>{task.busy ? 'Abriendo…' : 'Ver acuerdo'}<ArrowRight size={18} aria-hidden="true" /></button>}
+    </section>
+    <figure className="invitation-plan"><Tower unit={unit} /></figure>
+  </div>
+}
+
+export function ResolverInvitationPage() {
+  const { token = '' } = useParams()
+  const endpoint = '/resolver-invitations/' + encodeURIComponent(token)
+  const invitation = read<ResolverInvitation>(endpoint)
+  const session = useSession()
+  const task = useWork()
+  const query = useQueryClient()
+
+  if (invitation.isPending || session.isPending) return <Loading>Abriendo tu invitación…</Loading>
+  if (invitation.isError || session.isError) return <Feedback error={invitation.error ?? session.error} onRetry={() => {
+    void invitation.refetch()
+    void session.refetch()
+  }} />
+  const user = session.data.user
+  const returnTo = encodeURIComponent(resolverInvitationPath(token))
+  if (!invitation.data.mine) return <section className="section">
+    <Title>Invitación para un tercero</Title>
+    <p>Entra con el correo al que se envió la invitación para ver los datos de la operación.</p>
+    <ActionLink to={(user ? '/cuenta' : '/entrar') + '?volver=' + returnTo}>
+      {user ? 'Ir a mi cuenta para cerrar sesión' : 'Entrar para ver la invitación'}
+    </ActionLink>
+  </section>
+  const { unit, project, sellerName, status } = invitation.data
+  const accepted = status === 'accepted'
+
+  return <div className="invitation">
+    <section className="invitation-copy">
+      <h1>{unit}<span>{project.name}</span></h1>
+      <p className="muted">{project.city} · {sellerName}</p>
+      <p>{accepted ? 'Aceptaste participar como tercero designado. Verás el caso cuando te corresponda intervenir.' :
+        'El desarrollador te invitó a resolver devoluciones o desacuerdos como tercero designado en esta operación.'}</p>
+      <Feedback error={task.error} />
+      {!user ? <ActionLink to={'/entrar?volver=' + returnTo}>Entrar para ver la invitación</ActionLink> :
+        !user.kind ? <ActionLink to={'/cuenta?volver=' + returnTo}>Completar mi perfil</ActionLink> :
+            user.kind !== 'arbiter' ? <Feedback error="Esta invitación requiere una cuenta de tercero designado." /> :
+              accepted ? <ActionLink to="/">Ver mis casos</ActionLink> :
+                user.walletStatus !== 'active' ? <ActionLink to={'/cuenta?volver=' + returnTo}>Activar mi cuenta</ActionLink> :
+                  <button className="button primary" type="button" disabled={task.busy} onClick={() => void task.run(async () => {
+                    await write(endpoint + '/claim')
+                    query.setQueryData<ResolverInvitation>([endpoint], (current) => current?.mine ? { ...current, status: 'accepted' } : current)
+                    void query.invalidateQueries({ queryKey: ['/ops'] })
+                  })}>{task.busy ? 'Confirmando…' : 'Aceptar designación'}<ArrowRight size={18} aria-hidden="true" /></button>}
     </section>
     <figure className="invitation-plan"><Tower unit={unit} /></figure>
   </div>

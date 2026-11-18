@@ -26,6 +26,7 @@ export const TRUSTLESS_WORK_API_KEY = process.env.TRUSTLESS_WORK_API_KEY ?? ''
 export const TRUSTLESS_WORK_URL = (process.env.TRUSTLESS_WORK_API_URL ?? 'https://dev.api.trustlesswork.com').replace(/\/$/, '')
 export const POLLAR_SECRET_KEY = process.env.POLLAR_SECRET_KEY ?? ''
 export const POLLAR_SERVER_URL = (process.env.POLLAR_SERVER_URL ?? 'https://server.api.pollar.xyz').replace(/\/$/, '')
+export const ESQUORA_RESOLVER_EMAIL = process.env.ESQUORA_RESOLVER_EMAIL?.trim().toLowerCase() || ''
 
 export const PLATFORM_FEE_BPS = Number(process.env.PLATFORM_FEE_BPS ?? 90)
 export { TW_FEE_BPS } from '../shared/fees.ts'

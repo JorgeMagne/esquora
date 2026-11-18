@@ -10,6 +10,16 @@ Aplicación de preventas inmobiliarias sobre Stellar Testnet. Protege la cuota i
 
 El inicio prepara las cuentas de servicio de Testnet y comprueba su saldo. SQLite, los documentos y las claves de servicio se guardan en `DATA_DIR`. Conserva ese directorio entre reinicios. `ANCHOR_INITIAL_CENTS` controla el saldo inicial del proveedor simulado. Si la reserva inicial está en cero, el proveedor repone saldo cuando se necesita para un depósito.
 
+## Acuerdos y resolución
+
+Un borrador admite de uno a siete tramos editables y un contrato adjunto opcional. Los tramos reparten un único depósito. Para firmar el acuerdo, las partes deben tener una modalidad de resolución confirmada. La invitación a un tercero externo se comparte por enlace y solo se puede aceptar desde el correo indicado, con una cuenta de tercero activa.
+
+Al migrar una base de datos anterior, ESQUORA guarda primero una copia de SQLite en `DATA_DIR` y comprueba las referencias dentro de la transacción de migración.
+
+Para habilitar **ESQUORA verifica y ejecuta** en Testnet, configura `ESQUORA_RESOLVER_EMAIL` con el correo de una cuenta de tercero activa, distinta de las de comprador, desarrollador y cobro de comisiones. Las dos partes aceptan el mandato versionado al firmar el acuerdo. Ante un desacuerdo, presentan un reparto firmado por ambas o un documento emitido por la instancia pactada. La cuenta designada registra la verificación y el servidor solo prepara la transacción con los importes verificados. Una objeción invalida la instrucción antes del envío y conserva su registro en el historial de la operación.
+
+El mandato es para el entorno de pruebas. Para dinero real se debe validar la documentación admisible, la vía de resolución y el control independiente de la firma.
+
 ## Verificación
 
 - `npm run typecheck` comprueba los tipos.

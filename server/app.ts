@@ -8,7 +8,10 @@ import { streamSSE } from 'hono/streaming'
 import { StrKey } from '@stellar/stellar-sdk'
 import { canOpenConditionDispute } from '../shared/conditions.ts'
 import {
-  APP_URL, BOB_PER_USDC, EXPLORER_URL, HORIZON_URL, MAX_UPLOAD_BYTES, NETWORK_NAME,
+  changeResolutionInstruction, getResolutionInstruction, isResolutionReady, readResolutionCase, submitResolutionInstruction,
+} from './resolutions.ts'
+import {
+  APP_URL, BOB_PER_USDC, ESQUORA_RESOLVER_EMAIL, EXPLORER_URL, HORIZON_URL, MAX_UPLOAD_BYTES, NETWORK_NAME,
   NETWORK_PASSPHRASE, PLATFORM_FEE_BPS, SECURE_COOKIES, SESSION_DAYS, TEST_AUTH_TOKEN, TW_FEE_BPS, UPLOAD_DIR,
 } from './config.ts'
 import { all, get, inTransaction, newId, now, run, shortCode, token } from './db.ts'
@@ -20,10 +23,10 @@ import {
   runExclusive, submitAction, syncOperation, type ActionData,
 } from './chain.ts'
 import {
-  arbiterHasCase, buildTerms, fileMeta, HttpError, isOverdue, logEvent, opById, participants, publicParty,
-  push, refundWindowPassed, roleOf, serializeAction, serializeOp, serializeOpSummary, serializeOrder,
+  arbiterHasCase, buildTerms, fileMeta, HttpError, isOverdue, logEvent, opById, participants,
+  push, refundWindowPassed, roleOf, serializeAction, serializeAgreementTerms, serializeOp, serializeOpSummary, serializeOrder,
   subscribe, totalsOf, trancheById, tranchesOf, userById, type ChainTxRow, type DepositRow,
-  type OpRow, type UserRow,
+  type OpRow, type ResolutionMode, type UserRow,
 } from './domain.ts'
 
 type Env = { Variables: { user: UserRow } }
@@ -83,6 +86,7 @@ function privateUser(u: UserRow) {
   return {
     id: u.id, email: u.email, name: u.name, kind: u.kind, orgName: u.org_name, orgNit: u.org_nit,
     phone: u.phone, publicKey: u.public_key, walletStatus: u.wallet_status, createdAt: u.created_at,
+    esquoraVerifier: !!u.email && u.email === ESQUORA_RESOLVER_EMAIL,
   }
 }
 
@@ -179,6 +183,9 @@ app.patch('/api/me', auth, async (c) => {
   const b = await payload(c)
   const kind = b.kind ?? u.kind
   if (!accountTypes.includes(kind)) throw new HttpError(400, 'Elige un tipo de cuenta.')
+  if (u.email && u.email === ESQUORA_RESOLVER_EMAIL && kind !== 'arbiter') {
+    throw new HttpError(400, 'Esta dirección está reservada para la cuenta verificadora de ESQUORA.')
+  }
   if (u.kind && u.kind !== kind) throw new HttpError(409, 'El tipo de cuenta ya está definido.')
   run('UPDATE users SET kind = ?, name = ?, phone = ?, org_name = ?, org_nit = ? WHERE id = ?',
     kind, requireStr(b.name, 'nombre', 120), str(b.phone, 40) || null,
@@ -259,6 +266,7 @@ function canReadFile(u: UserRow, fileId: string) {
      WHERE (o.seller_id = ?1 OR o.buyer_id = ?1 OR o.arbiter_id = ?1)
        AND (o.contract_file_id = ?2
          OR EXISTS (SELECT 1 FROM tranches t JOIN evidence e ON e.tranche_id = t.id WHERE t.op_id = o.id AND e.file_id = ?2)
+         OR EXISTS (SELECT 1 FROM tranches t JOIN resolution_instructions r ON r.tranche_id = t.id WHERE t.op_id = o.id AND r.file_id = ?2)
          OR EXISTS (SELECT 1 FROM project_docs d WHERE d.project_id = o.project_id AND d.file_id = ?2))`,
     u.id,
     fileId,
@@ -292,10 +300,6 @@ app.get('/api/files/:id', auth, (c) => {
 })
 
 // ───────────────────────── Directorio de terceros ─────────────────────────
-
-app.get('/api/arbiters', auth, (c) =>
-  c.json(all<UserRow>("SELECT * FROM users WHERE kind = 'arbiter' AND wallet_status = 'active' ORDER BY org_name").map(publicParty)),
-)
 
 // ───────────────────────── Proyectos ─────────────────────────
 
@@ -423,6 +427,59 @@ app.get('/api/ops', auth, (c) => {
   return c.json(list)
 })
 
+type ResolverSelection = {
+  mode: ResolutionMode
+  arbiter: UserRow | null
+  email: string | null
+  inviteToken: string | null
+}
+
+function selectResolver(input: Record<string, unknown>, seller: UserRow, buyerEmail: string, previous?: OpRow): ResolverSelection {
+  const legacyId = !previous && TEST_AUTH_TOKEN && input.resolutionMode === undefined ? str(input.arbiterId, 80) : ''
+  if (legacyId) {
+    const arbiter = userById(legacyId)
+    if (!arbiter || arbiter.kind !== 'arbiter' || arbiter.wallet_status !== 'active') throw new HttpError(400, 'El tercero necesita una cuenta activa.')
+    if (arbiter.id === seller.id || arbiter.email === buyerEmail) throw new HttpError(400, 'El tercero debe ser distinto del comprador y el desarrollador.')
+    return { mode: 'external', arbiter, email: arbiter.email, inviteToken: null }
+  }
+  const mode = input.resolutionMode ?? 'pending'
+  if (mode === 'pending') return { mode, arbiter: null, email: null, inviteToken: null }
+  if (mode === 'esquora') {
+    const operator = ESQUORA_RESOLVER_EMAIL && get<UserRow>(
+      "SELECT * FROM users WHERE email = ? AND kind = 'arbiter' AND wallet_status = 'active'", ESQUORA_RESOLVER_EMAIL,
+    )
+    const arbiter = operator && operator.id !== seller.id && operator.email !== buyerEmail &&
+      !Object.values(ADDRESSES).includes(operator.public_key) ? operator : null
+    return { mode, arbiter, email: null, inviteToken: null }
+  }
+  if (mode !== 'external') throw new HttpError(400, 'Elige una modalidad de resolución válida.')
+  const email = emailAddress(input.arbiterEmail)
+  if (email === seller.email || email === buyerEmail || email === ESQUORA_RESOLVER_EMAIL) {
+    throw new HttpError(400, 'Invita a un tercero externo distinto de las partes y del equipo de ESQUORA.')
+  }
+  const sameInvitation = previous?.resolution_mode === 'external' && previous.arbiter_email === email ? previous : null
+  const arbiter = sameInvitation?.arbiter_id ? userById(sameInvitation.arbiter_id) ?? null : null
+  return { mode, arbiter, email, inviteToken: sameInvitation?.arbiter_invite_token ?? token(24) }
+}
+
+function updateDraftResolver(op: OpRow, choice: ResolverSelection) {
+  const terms = serializeAgreementTerms(JSON.parse(op.terms_json), choice.mode, choice.arbiter, choice.email)
+  run(`UPDATE operations SET resolution_mode = ?, arbiter_id = ?, arbiter_email = ?, arbiter_invite_token = ?,
+    terms_json = ?, terms_digest = ? WHERE id = ? AND status = 'draft'`,
+  choice.mode, choice.arbiter?.id ?? null, choice.email, choice.inviteToken, terms.json, terms.digest, op.id)
+  return opById(op.id)!
+}
+
+function requireResolverConsent(op: OpRow, consent: unknown) {
+  const resolver = op.arbiter_id ? userById(op.arbiter_id) : null
+  if (op.resolution_mode === 'pending' || !resolver || resolver.kind !== 'arbiter' || resolver.wallet_status !== 'active') {
+    throw new HttpError(409, 'El acuerdo necesita un tercero confirmado antes de firmarse.')
+  }
+  if (op.resolution_mode === 'esquora' && consent !== true) {
+    throw new HttpError(400, 'Acepta expresamente los términos de verificación y ejecución de ESQUORA antes de firmar.')
+  }
+}
+
 app.post('/api/ops', auth, async (c) => {
   const u = c.get('user')
   if (u.kind !== 'developer') throw new HttpError(403, 'Solo una cuenta de desarrollador puede crear operaciones.')
@@ -437,17 +494,19 @@ app.post('/api/ops', auth, async (c) => {
   const buyerName = requireStr(b.buyerName, 'nombre del comprador', 120)
   const buyerEmail = emailAddress(b.buyerEmail)
   if (buyerEmail === u.email) throw new HttpError(400, 'El comprador no puede ser tu propia cuenta.')
-  const arbiter = get<UserRow>("SELECT * FROM users WHERE id = ? AND kind = 'arbiter' AND wallet_status = 'active'", str(b.arbiterId, 80))
-  if (!arbiter) throw new HttpError(400, 'Elige el tercero designado en el contrato.')
-  const contract = get<any>('SELECT * FROM files WHERE id = ? AND uploaded_by = ?', str(b.contractFileId, 80), u.id)
-  if (!contract) throw new HttpError(400, 'Adjunta el contrato firmado.')
+  const resolver = selectResolver(b, u, buyerEmail)
+  const contractId = str(b.contractFileId, 80)
+  const contract = contractId ? get<{ id: string; sha256: string }>(
+    'SELECT id, sha256 FROM files WHERE id = ? AND uploaded_by = ?', contractId, u.id,
+  ) : null
+  if (contractId && !contract) throw new HttpError(400, 'Vuelve a adjuntar el contrato.')
   const requestedHours = b.refundResponseHours
   const hours = typeof requestedHours === 'number' && Number.isFinite(requestedHours) && requestedHours >= 1 / 60
     ? Math.min(Math.round(requestedHours * 60) / 60, 24 * 60)
     : 72
 
-  if (!Array.isArray(b.tranches) || b.tranches.length < 1 || b.tranches.length > 6)
-    throw new HttpError(400, 'Define entre uno y seis tramos.')
+  if (!Array.isArray(b.tranches) || b.tranches.length < 1 || b.tranches.length > 7)
+    throw new HttpError(400, 'Define entre uno y siete tramos.')
   const tranches = b.tranches.map((t: any, i: number) => {
     if (!t || typeof t !== 'object') throw new HttpError(400, 'Los datos de la condición no son válidos.')
     const dueAt = new Date(str(t.dueAt, 40))
@@ -483,19 +542,23 @@ app.post('/api/ops', auth, async (c) => {
     refundResponseHours: hours,
     seller: u,
     buyer: { name: buyerName, email: buyerEmail },
-    arbiter,
-    contractSha256: contract.sha256,
+    arbiter: resolver.arbiter,
+    arbiterEmail: resolver.email,
+    resolutionMode: resolver.mode,
+    contractSha256: contract?.sha256 ?? null,
     tranches,
   })
   const id = newId('op')
   inTransaction(() => {
     const existingBuyer = get<UserRow>("SELECT * FROM users WHERE email = ? AND kind = 'buyer'", buyerEmail)
     run(
-      `INSERT INTO operations (id, code, project_id, seller_id, buyer_id, buyer_email, buyer_name, arbiter_id, unit, unit_detail, price, deposit, fee_bps,
+      `INSERT INTO operations (id, code, project_id, seller_id, buyer_id, buyer_email, buyer_name, arbiter_id,
+         resolution_mode, arbiter_email, arbiter_invite_token, unit, unit_detail, price, deposit, fee_bps,
          refund_response_hours, contract_file_id, contract_sha256, terms_json, terms_digest, invite_token, status, created_at)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'draft',?)`,
-      id, code, project.id, u.id, existingBuyer?.id ?? null, buyerEmail, buyerName, arbiter.id, unit, unitDetail || null,
-      price, deposit, PLATFORM_FEE_BPS, hours, contract.id, contract.sha256, terms.json, terms.digest, token(18), now(),
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'draft',?)`,
+      id, code, project.id, u.id, existingBuyer?.id ?? null, buyerEmail, buyerName, resolver.arbiter?.id ?? null,
+      resolver.mode, resolver.email, resolver.inviteToken, unit, unitDetail || null,
+      price, deposit, PLATFORM_FEE_BPS, hours, contract?.id ?? null, contract?.sha256 ?? null, terms.json, terms.digest, token(18), now(),
     )
     for (const [index, tranche] of tranches.entries()) {
       run(
@@ -518,16 +581,74 @@ app.get('/api/ops/:id', auth, async (c) => {
   return c.json(serializeOp(loadOp(u, id).op, u))
 })
 
+app.patch('/api/ops/:id/resolver', auth, async (c) => {
+  const u = c.get('user')
+  const id = c.req.param('id') ?? ''
+  const input = await payload(c)
+  return runExclusive('op:' + id, async () => {
+    const { op, role } = loadOp(u, id)
+    if (role !== 'seller' || op.status !== 'draft') throw new HttpError(409, 'La modalidad solo se puede cambiar mientras el acuerdo está en borrador.')
+    if (input.resolutionMode === undefined) throw new HttpError(400, 'Indica la modalidad de resolución.')
+    const choice = selectResolver(input, u, op.buyer_email, op)
+    const updated = updateDraftResolver(op, choice)
+    logEvent(updated, u.id, 'resolver_updated')
+    return c.json(serializeOp(updated, u))
+  })
+})
+
+function resolverInvitation(value: string) {
+  const op = get<OpRow>("SELECT * FROM operations WHERE arbiter_invite_token = ? AND resolution_mode = 'external' AND status != 'cancelled'", value)
+  if (!op) throw new HttpError(404, 'Esta invitación ya no está disponible.')
+  return op
+}
+
+app.get('/api/resolver-invitations/:token', (c) => {
+  const op = resolverInvitation(c.req.param('token'))
+  const u = currentUser(c)
+  if (!u?.email || u.email !== op.arbiter_email) return c.json({ mine: false })
+  const project = get<{ name: string; city: string }>('SELECT name, city FROM projects WHERE id = ?', op.project_id)
+  const seller = userById(op.seller_id)!
+  return c.json({
+    opId: op.id, code: op.code, unit: op.unit, project, sellerName: seller.org_name ?? seller.name,
+    status: op.arbiter_id ? 'accepted' : 'pending', mine: true,
+  })
+})
+
+app.post('/api/resolver-invitations/:token/claim', auth, async (c) => {
+  const u = c.get('user')
+  const invite = c.req.param('token') ?? ''
+  const initial = resolverInvitation(invite)
+  return runExclusive('op:' + initial.id, async () => {
+    const op = resolverInvitation(invite)
+    if (u.kind !== 'arbiter' || !u.email || u.email !== op.arbiter_email || u.email === ESQUORA_RESOLVER_EMAIL) {
+      throw new HttpError(403, 'Abre la invitación con la cuenta de tercero y el correo al que se envió.')
+    }
+    if (u.wallet_status !== 'active') throw new HttpError(409, 'Activa tu cuenta antes de aceptar la invitación.')
+    if (op.arbiter_id === u.id) return c.json({ opId: op.id, status: 'accepted' })
+    if (op.status !== 'draft' || op.arbiter_id) throw new HttpError(409, 'Esta invitación ya no se puede aceptar.')
+    const updated = inTransaction(() => {
+      const next = updateDraftResolver(op, { mode: 'external', arbiter: u, email: op.arbiter_email, inviteToken: invite })
+      logEvent(next, u.id, 'resolver_accepted')
+      return next
+    })
+    return c.json({ opId: updated.id, status: 'accepted' })
+  })
+})
+
 app.post('/api/ops/:id/send', auth, async (c) => {
   const u = c.get('user')
-  const { signature } = await payload(c)
-  const { op, role } = loadOp(u, c.req.param('id') ?? '')
-  if (role !== 'seller' || op.status !== 'draft') throw new HttpError(409, 'Este acuerdo ya fue enviado.')
-  const value = requireStr(signature, 'firma del acuerdo', 200)
-  if (!verifyAgreementSignature(op.terms_digest, u.public_key, value)) throw new HttpError(400, 'La firma no corresponde a este acuerdo.')
-  run("UPDATE operations SET seller_sig = ?, seller_signed_at = ?, status = 'invited' WHERE id = ?", value, now(), op.id)
-  logEvent(opById(op.id)!, u.id, 'invited')
-  return c.json(serializeOp(opById(op.id)!, u))
+  const id = c.req.param('id') ?? ''
+  const { signature, resolutionConsent } = await payload(c)
+  return runExclusive('op:' + id, async () => {
+    const { op, role } = loadOp(u, id)
+    if (role !== 'seller' || op.status !== 'draft') throw new HttpError(409, 'Este acuerdo ya fue enviado.')
+    requireResolverConsent(op, resolutionConsent)
+    const value = requireStr(signature, 'firma del acuerdo', 200)
+    if (!verifyAgreementSignature(op.terms_digest, u.public_key, value)) throw new HttpError(400, 'La firma no corresponde a este acuerdo.')
+    run("UPDATE operations SET seller_sig = ?, seller_signed_at = ?, status = 'invited' WHERE id = ?", value, now(), op.id)
+    logEvent(opById(op.id)!, u.id, 'invited')
+    return c.json(serializeOp(opById(op.id)!, u))
+  })
 })
 
 app.post('/api/ops/:id/cancel', auth, async (c) => {
@@ -580,13 +701,14 @@ app.post('/api/invitations/:token/claim', auth, (c) => {
 app.post('/api/ops/:id/accept', auth, async (c) => {
   const u = c.get('user')
   const id = c.req.param('id') ?? ''
-  const { signature } = await payload(c)
+  const { signature, resolutionConsent } = await payload(c)
   return runExclusive('op:' + id, async () => {
     const { op, role } = loadOp(u, id)
     if (role !== 'buyer') throw new HttpError(403, 'Solo el comprador puede aceptar este acuerdo.')
     if (op.status === 'deploying' || op.escrow_contract_id) return c.json(serializeOp(op, u))
     if (op.status !== 'invited') throw new HttpError(409, 'El acuerdo ya no espera tu aceptación.')
     if (u.wallet_status !== 'active') throw new HttpError(409, 'Activa tu cuenta antes de aceptar el acuerdo.')
+    requireResolverConsent(op, resolutionConsent)
     const value = requireStr(signature, 'firma del acuerdo', 200)
     if (!verifyAgreementSignature(op.terms_digest, u.public_key, value)) throw new HttpError(400, 'La firma no corresponde a este acuerdo.')
     await deployOperation(op, u.id, value)
@@ -705,6 +827,32 @@ app.post('/api/tranches/:id/refund-response', auth, async (c) => {
   })
 })
 
+app.get('/api/tranches/:id/resolution-instruction', auth, (c) => {
+  const { op, t } = loadTranche(c.get('user'), c.req.param('id') ?? '')
+  if (op.resolution_mode !== 'esquora') throw new HttpError(404, 'La modalidad de ESQUORA no aplica a esta operación.')
+  return c.json(readResolutionCase(op, t))
+})
+
+app.post('/api/tranches/:id/resolution-instruction', auth, async (c) => {
+  const user = c.get('user')
+  const id = c.req.param('id') ?? ''
+  const body = await payload(c)
+  const { op: operation } = loadTranche(user, id)
+  return runExclusive('op:' + operation.id, async () => {
+    const { op, t } = loadTranche(user, id)
+    if (op.resolution_mode !== 'esquora' || !isResolutionReady(op, t)) {
+      throw new HttpError(409, 'El tramo todavía no admite una instrucción de resolución.')
+    }
+    assertNoPending(t.id)
+    inTransaction(() => {
+      if (body.action === 'submit') submitResolutionInstruction(op, t, user, body)
+      else changeResolutionInstruction(op, t, user, body)
+      if (body.action === 'object') invalidateArmed(t.id)
+    })
+    return c.json(readResolutionCase(op, t))
+  })
+})
+
 function armingAllowed(user: UserRow) {
   if (user.wallet_status !== 'active') throw new HttpError(409, 'Activa tu cuenta para continuar.')
 }
@@ -762,11 +910,18 @@ async function armTranche(u: UserRow, id: string, kind: TrancheAction, b: Record
       }
       data = { reason: requireStr(b.reason, 'motivo del desacuerdo', 1000) }
     } else {
-      if (role !== 'arbiter' || (t.status !== 'disputed' &&
-          !(t.status === 'refund_requested' && (t.refund_response || refundWindowPassed(op, t))))) {
+      if (role !== 'arbiter' || !isResolutionReady(op, t)) {
         throw new HttpError(409, 'El caso todavía no está listo para resolver.')
       }
-      if (t.refund_response === 'accepted') {
+      if (op.resolution_mode === 'esquora') {
+        const instruction = getResolutionInstruction(t.id)
+        if (!instruction?.verified_at || instruction.id !== b.instructionId) {
+          throw new HttpError(409, 'Primero verifica la instrucción documentada para este tramo.')
+        }
+        toBuyer = instruction.to_buyer
+        toSeller = instruction.to_seller
+        data = { instructionId: instruction.id, note: 'Instrucción ' + instruction.id + '. ' + instruction.verification_note }
+      } else if (t.refund_response === 'accepted') {
         toBuyer = t.amount
         toSeller = 0
       } else {
@@ -780,7 +935,7 @@ async function armTranche(u: UserRow, id: string, kind: TrancheAction, b: Record
         toBuyer = buyerShare
         toSeller = sellerShare
       }
-      data = { note: str(b.note, 1000) || undefined }
+      if (op.resolution_mode !== 'esquora') data = { note: str(b.note, 1000) || undefined }
     }
     const xdr = await buildMilestoneAction({
       kind: kind === 'refund' ? 'dispute' : kind, contractId: op.escrow_contract_id, index: t.idx,
@@ -915,7 +1070,8 @@ app.get('/api/notifications', auth, (c) => {
      WHERE ((o.seller_id = ?1 AND e.type != 'refund_response_expired')
          OR (o.buyer_id = ?1 AND o.status != 'draft' AND e.type NOT IN ('created', 'refund_response_expired'))
          OR (o.arbiter_id = ?1 AND e.type IN (
-           'dispute_opened', 'resolution_proposed', 'refund_requested', 'refund_responded', 'refund_response_expired', 'resolved', 'refunded'
+           'dispute_opened', 'resolution_proposed', 'resolution_signed', 'resolution_verified', 'resolution_objected',
+           'refund_requested', 'refund_responded', 'refund_response_expired', 'resolved', 'refunded'
          )))
        AND (e.actor_id IS NULL OR e.actor_id != ?1)
      ORDER BY e.id DESC LIMIT 30`,

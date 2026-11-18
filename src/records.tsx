@@ -145,7 +145,7 @@ export function VerificationPage() {
             <div><dt>Saldo leído de la red</dt><dd>{money(data.held)}</dd></div>
             <div><dt>Activo de prueba</dt><dd>{data.asset?.code}</dd></div>
             {data.asset?.issuer && <div><dt>Emisor</dt><dd><code>{data.asset.issuer}</code></dd></div>}
-            <div><dt>Huella del contrato</dt><dd><code>{data.contractSha256}</code></dd></div>
+            {data.contractSha256 && <div><dt>Huella del contrato adjunto</dt><dd><code>{data.contractSha256}</code></dd></div>}
             <div><dt>Huella del acuerdo</dt><dd><code>{data.termsDigest}</code></dd></div>
           </dl>
           <ExplorerLink base={explorer} hash={data.contractId} kind="contract">Ver contrato en Stellar</ExplorerLink>

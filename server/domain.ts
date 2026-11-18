@@ -2,6 +2,7 @@
 
 import { createHash } from 'node:crypto'
 import { netAfterFees } from '../shared/fees.ts'
+import { ESQUORA_RESOLUTION_TERMS } from '../shared/resolution-terms.ts'
 import { APP_URL, TW_FEE_BPS } from './config.ts'
 import { all, get, now, run } from './db.ts'
 import { ADDRESSES, centsToAmount } from './stellar.ts'
@@ -23,6 +24,8 @@ export interface UserRow {
   created_at: string
 }
 
+export type ResolutionMode = 'pending' | 'external' | 'esquora'
+
 export interface OpRow {
   id: string
   code: string
@@ -31,15 +34,18 @@ export interface OpRow {
   buyer_id: string | null
   buyer_email: string
   buyer_name: string
-  arbiter_id: string
+  arbiter_id: string | null
+  resolution_mode: ResolutionMode
+  arbiter_email: string | null
+  arbiter_invite_token: string | null
   unit: string
   unit_detail: string | null
   price: number
   deposit: number
   fee_bps: number
   refund_response_hours: number
-  contract_file_id: string
-  contract_sha256: string
+  contract_file_id: string | null
+  contract_sha256: string | null
   terms_json: string
   terms_digest: string
   seller_sig: string | null
@@ -252,12 +258,14 @@ export function buildTerms(input: {
   refundResponseHours: number
   seller: UserRow
   buyer: { name: string; email: string }
-  arbiter: UserRow
-  contractSha256: string
+  arbiter: UserRow | null
+  arbiterEmail: string | null
+  resolutionMode: ResolutionMode
+  contractSha256: string | null
   tranches: { title: string; condition: string; requirements: { key: string; label: string }[]; amount: number; dueAt: string }[]
 }) {
   const terms = {
-    version: 1,
+    version: 2,
     operacion: input.code,
     inmueble: {
       proyecto: input.project.name, ciudad: input.project.city, direccion: input.project.address, unidad: input.unit,
@@ -271,7 +279,6 @@ export function buildTerms(input: {
     comisionAplicaA: ['liberacion', 'devolucion'],
     desarrollador: { nombre: input.seller.org_name ?? input.seller.name, cuenta: input.seller.public_key },
     comprador: { nombre: input.buyer.name, correo: input.buyer.email },
-    terceroDesignado: { nombre: input.arbiter.org_name ?? input.arbiter.name, cuenta: input.arbiter.public_key },
     contratoSha256: input.contractSha256,
     plazoRespuestaDevolucionHoras: input.refundResponseHours,
     tramos: input.tranches.map((t, i) => ({
@@ -283,7 +290,18 @@ export function buildTerms(input: {
       fechaLimite: t.dueAt,
     })),
   }
-  const json = JSON.stringify(terms)
+  return serializeAgreementTerms(terms, input.resolutionMode, input.arbiter, input.arbiterEmail)
+}
+
+export function serializeAgreementTerms(terms: Record<string, unknown>, mode: ResolutionMode, resolver: UserRow | null, email: string | null) {
+  const json = JSON.stringify({
+    ...terms,
+    version: 2,
+    modalidadResolucion: mode,
+    terceroDesignado: resolver ? { nombre: resolver.org_name ?? resolver.name, cuenta: resolver.public_key } : null,
+    terceroCorreo: mode === 'external' ? email : null,
+    resolucionEsquora: mode === 'esquora' ? ESQUORA_RESOLUTION_TERMS : null,
+  })
   return { json, digest: createHash('sha256').update(json).digest('hex') }
 }
 
@@ -312,16 +330,24 @@ export function serializeAction(tx: ChainTxRow) {
 
 export function todoFor(op: OpRow, tranches: TrancheRow[], role: Role): string | null {
   if (op.status === 'deploying') return 'Confirmando la operación'
-  if (role === 'seller' && op.status === 'draft') return 'Confirma el acuerdo para enviarlo'
+  if (role === 'seller' && op.status === 'draft') {
+    if (op.resolution_mode === 'pending') return 'Elige cómo resolver un desacuerdo'
+    if (!op.arbiter_id) return op.resolution_mode === 'external' ? 'Esperando al tercero invitado' : 'Designa al equipo de ESQUORA'
+    return 'Confirma el acuerdo para enviarlo'
+  }
   if (role === 'buyer' && op.status === 'invited') return 'Revisa y acepta el acuerdo'
   if (role === 'buyer' && op.status === 'awaiting_deposit') return 'Deposita la cuota inicial'
   if (op.status !== 'funded') return null
   for (const t of tranches) {
     const n = t.idx + 1
     if (activeTxOf(t.id)) return 'Confirmando la condición ' + n
-    if (t.status === 'disputed') return role === 'arbiter' ? 'Revisa el desacuerdo en la condición ' + n : 'El tercero revisa la condición ' + n
+    if (t.status === 'disputed') return op.resolution_mode === 'esquora' ?
+      (role === 'arbiter' ? 'Revisa la instrucción de la condición ' : 'Consulta la instrucción de la condición ') + n :
+      role === 'arbiter' ? 'Revisa el desacuerdo en la condición ' + n : 'El tercero revisa la condición ' + n
     if (t.status === 'refund_requested') {
       if (t.refund_response || refundWindowPassed(op, t)) {
+        if (op.resolution_mode === 'esquora') return role === 'arbiter' ?
+          'Revisa la instrucción de devolución' : 'Consulta la instrucción de devolución'
         return role === 'arbiter' ? 'Resuelve la devolución de la condición ' + n : 'El tercero resolverá la devolución'
       }
       if (role === 'seller') return 'Responde la devolución de la condición ' + n
@@ -380,7 +406,7 @@ export function serializeOp(op: OpRow, viewer: UserRow) {
   const project = get<any>('SELECT id, name, city, address FROM projects WHERE id = ?', op.project_id)
   const seller = userById(op.seller_id)!
   const buyer = op.buyer_id ? userById(op.buyer_id)! : null
-  const arbiter = userById(op.arbiter_id)!
+  const arbiter = op.arbiter_id ? userById(op.arbiter_id) : null
   const events = all<any>(
     `SELECT e.id, e.type, e.data_json, e.tx_hash, e.created_at, e.actor_id FROM events e WHERE e.op_id = ? ORDER BY e.id DESC LIMIT 200`,
     op.id,
@@ -406,8 +432,13 @@ export function serializeOp(op: OpRow, viewer: UserRow) {
     buyer: buyer ? publicParty(buyer) : null,
     buyerName: op.buyer_name,
     buyerEmail: op.buyer_email,
-    arbiter: publicParty(arbiter),
-    contract: fileMeta(op.contract_file_id),
+    arbiter: arbiter ? publicParty(arbiter) : null,
+    resolutionMode: op.resolution_mode,
+    arbiterEmail: op.arbiter_email,
+    arbiterInviteToken: role === 'seller' && op.status === 'draft' && !arbiter ? op.arbiter_invite_token : null,
+    resolverReady: arbiter?.wallet_status === 'active',
+    resolutionTerms: op.resolution_mode === 'esquora' ? JSON.parse(op.terms_json).resolucionEsquora : null,
+    contract: op.contract_file_id ? fileMeta(op.contract_file_id) : null,
     contractSha256: op.contract_sha256,
     terms: op.terms_json,
     termsDigest: op.terms_digest,

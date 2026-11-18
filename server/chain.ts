@@ -12,7 +12,7 @@ import {
 
 type Receipt = Awaited<ReturnType<typeof findTransaction>>
 type Evidence = { reqKey: string; fileId: string }
-export type ActionData = { items?: Evidence[]; note?: string; reason?: string; amount?: number }
+export type ActionData = { items?: Evidence[]; note?: string; reason?: string; amount?: number; instructionId?: string }
 
 const queues = new Map<string, Promise<unknown>>()
 export async function runExclusive<T>(key: string, work: () => Promise<T>): Promise<T> {
@@ -237,6 +237,19 @@ function verifySigned(action: ChainTxRow, signedXdr: string) {
 
 function persistSubmission(action: ChainTxRow, signedXdr: string) {
   verifySigned(action, signedXdr)
+  if (action.kind === 'resolve' && action.op_id && opById(action.op_id)?.resolution_mode === 'esquora') {
+    const { instructionId } = JSON.parse(action.payload_json) as ActionData
+    const submitted = run(
+      `UPDATE chain_txs SET status = 'pending', signed_xdr = ?, submitted_at = ? WHERE id = ? AND status = 'armed'
+       AND EXISTS (SELECT 1 FROM resolution_instructions
+         WHERE id = ? AND tranche_id = ? AND verified_at IS NOT NULL AND voided_at IS NULL)`,
+      signedXdr, now(), action.id, instructionId ?? null, action.tranche_id,
+    )
+    if (!submitted.changes && actionById(action.id)?.status === 'armed') {
+      throw new HttpError(409, 'La instrucción dejó de estar verificada. Vuelve a consultarla.')
+    }
+    return submitted
+  }
   return run("UPDATE chain_txs SET status = 'pending', signed_xdr = ?, submitted_at = ? WHERE id = ? AND status = 'armed'",
     signedXdr, now(), action.id)
 }
@@ -272,12 +285,14 @@ async function serviceReady(address: string) {
 
 export function deployOperation(op: OpRow, actorId: string, signature: string) {
   return runExclusive('service:platform', async () => {
+    const resolver = op.arbiter_id ? userById(op.arbiter_id) : null
+    if (!resolver) throw new HttpError(409, 'Designa un tercero antes de activar la protección.')
     await serviceReady(ADDRESSES.platform)
     const project = get<{ name: string }>('SELECT name FROM projects WHERE id = ?', op.project_id)!
     const xdr = await buildDeploy({
       engagementId: op.code, title: project.name + ' · ' + op.unit,
-      description: 'ESQUORA | contrato sha256:' + op.contract_sha256 + ' | acuerdo sha256:' + op.terms_digest,
-      buyer: userById(op.buyer_id!)!.public_key, seller: userById(op.seller_id)!.public_key, arbiter: userById(op.arbiter_id)!.public_key,
+      description: 'ESQUORA' + (op.contract_sha256 ? ' | contrato sha256:' + op.contract_sha256 : '') + ' | acuerdo sha256:' + op.terms_digest,
+      buyer: userById(op.buyer_id!)!.public_key, seller: userById(op.seller_id)!.public_key, arbiter: resolver.public_key,
       feeBps: op.fee_bps, tranches: tranchesOf(op.id).map((t) => ({ title: t.title, amount: t.amount })),
     })
     const signed = signService(xdr, 'platform')

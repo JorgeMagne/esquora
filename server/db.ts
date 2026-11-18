@@ -6,6 +6,46 @@ import { DATA_DIR } from './config.ts'
 export const db = new DatabaseSync(join(DATA_DIR, 'esquora.db'))
 db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;')
 
+const operationSchema = `(
+  id TEXT PRIMARY KEY,
+  code TEXT NOT NULL UNIQUE,
+  project_id TEXT NOT NULL REFERENCES projects(id),
+  seller_id TEXT NOT NULL REFERENCES users(id),
+  buyer_id TEXT REFERENCES users(id),
+  buyer_email TEXT NOT NULL,
+  buyer_name TEXT NOT NULL,
+  arbiter_id TEXT REFERENCES users(id),
+  resolution_mode TEXT NOT NULL DEFAULT 'external' CHECK (resolution_mode IN ('pending','external','esquora')),
+  arbiter_email TEXT,
+  arbiter_invite_token TEXT UNIQUE,
+  unit TEXT NOT NULL,
+  unit_detail TEXT,
+  price INTEGER NOT NULL,
+  deposit INTEGER NOT NULL,
+  fee_bps INTEGER NOT NULL,
+  refund_response_hours REAL NOT NULL,
+  contract_file_id TEXT REFERENCES files(id),
+  contract_sha256 TEXT,
+  terms_json TEXT NOT NULL,
+  terms_digest TEXT NOT NULL,
+  seller_sig TEXT,
+  seller_signed_at TEXT,
+  buyer_sig TEXT,
+  invite_token TEXT NOT NULL UNIQUE,
+  status TEXT NOT NULL,
+  decline_reason TEXT,
+  escrow_contract_id TEXT UNIQUE,
+  escrow_tx TEXT,
+  deployment_error TEXT,
+  held_on_chain INTEGER,
+  observed_at TEXT,
+  observed_ledger INTEGER,
+  created_at TEXT NOT NULL,
+  accepted_at TEXT,
+  funded_at TEXT,
+  closed_at TEXT
+)`
+
 db.exec(`
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
@@ -54,42 +94,7 @@ CREATE TABLE IF NOT EXISTS project_docs (
   file_id TEXT NOT NULL REFERENCES files(id),
   created_at TEXT NOT NULL
 );
-CREATE TABLE IF NOT EXISTS operations (
-  id TEXT PRIMARY KEY,
-  code TEXT NOT NULL UNIQUE,
-  project_id TEXT NOT NULL REFERENCES projects(id),
-  seller_id TEXT NOT NULL REFERENCES users(id),
-  buyer_id TEXT REFERENCES users(id),
-  buyer_email TEXT NOT NULL,
-  buyer_name TEXT NOT NULL,
-  arbiter_id TEXT NOT NULL REFERENCES users(id),
-  unit TEXT NOT NULL,
-  unit_detail TEXT,
-  price INTEGER NOT NULL,
-  deposit INTEGER NOT NULL,
-  fee_bps INTEGER NOT NULL,
-  refund_response_hours REAL NOT NULL,
-  contract_file_id TEXT NOT NULL REFERENCES files(id),
-  contract_sha256 TEXT NOT NULL,
-  terms_json TEXT NOT NULL,
-  terms_digest TEXT NOT NULL,
-  seller_sig TEXT,
-  seller_signed_at TEXT,
-  buyer_sig TEXT,
-  invite_token TEXT NOT NULL UNIQUE,
-  status TEXT NOT NULL,
-  decline_reason TEXT,
-  escrow_contract_id TEXT UNIQUE,
-  escrow_tx TEXT,
-  deployment_error TEXT,
-  held_on_chain INTEGER,
-  observed_at TEXT,
-  observed_ledger INTEGER,
-  created_at TEXT NOT NULL,
-  accepted_at TEXT,
-  funded_at TEXT,
-  closed_at TEXT
-);
+CREATE TABLE IF NOT EXISTS operations ${operationSchema};
 CREATE TABLE IF NOT EXISTS tranches (
   id TEXT PRIMARY KEY,
   op_id TEXT NOT NULL REFERENCES operations(id),
@@ -205,12 +210,29 @@ if (!evidenceColumns.some((column) => column.name === 'version_hash')) {
 if (!evidenceColumns.some((column) => column.name === 'is_current')) {
   db.exec('ALTER TABLE evidence ADD COLUMN is_current INTEGER NOT NULL DEFAULT 1 CHECK (is_current IN (0,1))')
 }
-const operationColumns = db.prepare('PRAGMA table_info(operations)').all()
-if (!operationColumns.some((column) => column.name === 'observed_ledger')) {
-  db.exec('ALTER TABLE operations ADD COLUMN observed_ledger INTEGER')
-}
-if (!operationColumns.some((column) => column.name === 'unit_detail')) {
-  db.exec('ALTER TABLE operations ADD COLUMN unit_detail TEXT')
+if (!db.prepare('PRAGMA table_info(operations)').all().some((column) => column.name === 'resolution_mode')) {
+  // SQLite requiere reemplazar la tabla para quitar NOT NULL sin cambiar las referencias de sus tablas hijas.
+  const snapshotPath = join(DATA_DIR, 'esquora-antes-de-acuerdos-' + Date.now() + '.db')
+  db.prepare('VACUUM main INTO ?').run(snapshotPath)
+  console.log('Copia de SQLite guardada en el volumen antes de actualizar los acuerdos.')
+  db.exec('PRAGMA foreign_keys = OFF')
+  try {
+    inTransaction(() => {
+      const previous = db.prepare('PRAGMA table_info(operations)').all()
+      if (previous.some((column) => column.name === 'resolution_mode')) return
+      const dependents = db.prepare("SELECT sql FROM sqlite_schema WHERE tbl_name = 'operations' AND type IN ('index', 'trigger') AND sql IS NOT NULL").all()
+      db.exec('CREATE TABLE operations_migrated ' + operationSchema)
+      const migrated = new Set(db.prepare('PRAGMA table_info(operations_migrated)').all().map((column) => column.name))
+      const columns = previous.filter((column) => migrated.has(column.name))
+        .map((column) => '"' + String(column.name).replaceAll('"', '""') + '"').join(', ')
+      db.exec('INSERT INTO operations_migrated (' + columns + ') SELECT ' + columns + ' FROM operations')
+      db.exec('DROP TABLE operations; ALTER TABLE operations_migrated RENAME TO operations;')
+      for (const artifact of dependents) db.exec(String(artifact.sql))
+      if (db.prepare('PRAGMA foreign_key_check').get()) throw new Error('La migración de operaciones produjo referencias inválidas.')
+    })
+  } finally {
+    db.exec('PRAGMA foreign_keys = ON')
+  }
 }
 db.exec('CREATE INDEX IF NOT EXISTS idx_evidence_tranche ON evidence(tranche_id, created_at);')
 

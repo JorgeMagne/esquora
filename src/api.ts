@@ -1,11 +1,13 @@
 import { useQuery } from '@tanstack/react-query'
 import type { AccountKind, Role } from './model.ts'
 
-export type User = { id: string; name: string; email: string; kind: AccountKind | null; orgName: string | null; orgNit: string | null; phone: string | null; publicKey: string; walletStatus: string }
+export type User = { id: string; name: string; email: string; kind: AccountKind | null; orgName: string | null; orgNit: string | null; phone: string | null; publicKey: string; walletStatus: string; esquoraVerifier?: boolean }
 export type Asset = { code: string; issuer: string }
 export type Config = { explorerUrl: string; network: string; asset: Asset; feeBps: number; bobPerUsdc: number; appUrl?: string; testMode?: boolean }
 export type Session = { user: User | null; config: Config }
 export type Party = { id: string; name: string; orgName: string | null; publicKey?: string }
+export type ResolutionMode = 'pending' | 'external' | 'esquora'
+export type ResolutionTerms = { version: string; title: string; clauses: string[] }
 export type FileInfo = { id: string; name: string; sha256: string; size: number; mime: string }
 export type Evidence = { reqKey: string; file: FileInfo | null }
 export type Totals = { held: number; released: number; refunded: number; fees?: number }
@@ -16,7 +18,7 @@ export type TrancheSummary = { idx: number; title: string; amount: number; statu
 export type ActionKind = 'evidence' | 'approve' | 'release' | 'refund' | 'dispute' | 'resolve' | 'withdraw' | 'probe'
 export type Receipt = { status: 'pending' | 'confirmed' | 'failed'; hash?: string; error?: string | null; ledger?: number | null }
 export type Armed = Partial<Receipt> & { id?: string; xdr?: string; expiresAt?: number | string | null }
-export type ActionInput = { kind: ActionKind; trancheId?: string; opId?: string; items?: { reqKey: string; fileId: string }[]; note?: string; reason?: string; toBuyer?: number; toSeller?: number; amount?: number; bank?: string; account?: string; holder?: string; ledger?: boolean }
+export type ActionInput = { kind: ActionKind; trancheId?: string; opId?: string; items?: { reqKey: string; fileId: string }[]; note?: string; reason?: string; toBuyer?: number; toSeller?: number; amount?: number; bank?: string; account?: string; holder?: string; ledger?: boolean; instructionId?: string }
 export type Tranche = TrancheSummary & {
   id: string; condition: string; requirements: Requirement[]; feeEstimate: number; evidence: Evidence[];
   evidenceNote: string | null; objection: string | null; refundRequestedAt: string | null; refundWindowPassed: boolean;
@@ -33,7 +35,9 @@ export type OperationSummary = {
 }
 export type Operation = Omit<OperationSummary, 'tranches'> & {
   feeBps: number; refundResponseHours: number; seller: Party; buyer: Party | null; buyerEmail: string;
-  arbiter: Party; contract: FileInfo | null; contractSha256: string; termsDigest: string;
+  resolutionMode: ResolutionMode; arbiter: Party | null; arbiterEmail: string | null; arbiterInviteToken: string | null;
+  resolverReady: boolean; resolutionTerms: ResolutionTerms | null;
+  contract: FileInfo | null; contractSha256: string | null; termsDigest: string;
   sellerSig: string | null; buyerSig: string | null; inviteToken: string | null; declineReason: string | null;
   deploymentError?: string | null;
   escrow: { account: string; contractId?: string; txHash: string | null } | null;
@@ -48,6 +52,10 @@ export type Invitation = {
   opId: string; code: string; project: Pick<Project, 'name' | 'city'>; unit: string; unitDetail?: string | null; deposit: number; price: number;
   sellerName: string; claimed: boolean; mine: boolean; status: string;
 }
+export type ResolverInvitation = { mine: false } | {
+  opId: string; code: string; unit: string; project: Pick<Project, 'name' | 'city'>; sellerName: string;
+  status: 'pending' | 'accepted'; mine: true;
+}
 export type Wallet = {
   usdc: number; exists: boolean;
   movements: { id: string; incoming: boolean; cents: number; at: string; txHash: string; label: string; opId: string | null }[];
@@ -55,7 +63,7 @@ export type Wallet = {
 }
 export type Notification = Activity & { opId: string; code: string; unit: string; unread: boolean }
 export type Verification = {
-  contractId: string | null; roles: Record<string, unknown>; held: number; asset: Asset; contractSha256: string; termsDigest: string;
+  contractId: string | null; roles: Record<string, unknown>; held: number; asset: Asset; contractSha256: string | null; termsDigest: string;
   explorerUrl?: string; transactions: (Receipt & { id?: string; kind?: string; confirmedAt?: string })[];
 }
 
@@ -100,8 +108,14 @@ export function readOperation(id: string) {
   return useQuery({
     queryKey: ['/ops/' + id],
     queryFn: ({ signal }) => api<Operation>('/ops/' + id, { signal }),
-    refetchInterval: (query) => query.state.data?.status === 'deploying' || query.state.data?.depositOrder?.status === 'paid' ||
-      query.state.data?.tranches.some((tranche) => tranche.pendingAction?.status === 'pending') ? 3500 : false,
+    refetchInterval: (query) => {
+      const operation = query.state.data
+      if (!operation) return false
+      if (operation.status === 'deploying' || operation.depositOrder?.status === 'paid' ||
+        operation.tranches.some((tranche) => tranche.pendingAction?.status === 'pending')) return 3500
+      if (operation.status === 'draft' && operation.role === 'seller' && operation.resolutionMode === 'external' && !operation.resolverReady) return 6000
+      return false
+    },
   })
 }
 
@@ -115,5 +129,6 @@ export const fileLink = (file: FileInfo) => '/api/files/' + encodeURIComponent(f
 export const operationPath = (id: string) => '/operaciones/' + encodeURIComponent(id)
 export const conditionPath = (id: string, trancheId: string) => operationPath(id) + '/condiciones/' + encodeURIComponent(trancheId)
 export const invitationPath = (token: string) => '/invitacion/' + encodeURIComponent(token)
+export const resolverInvitationPath = (token: string) => '/tercero/' + encodeURIComponent(token)
 export const projectPath = (id: string) => '/proyectos/' + encodeURIComponent(id)
 export const paymentPath = (id: string) => '/pago/' + encodeURIComponent(id)

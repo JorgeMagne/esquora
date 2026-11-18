@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { netAfterFees } from '../shared/fees.ts'
-import { amountInCents, boliviaDateTime, conditionAmounts, money, nextConditionAction, towerStage } from './model.ts'
+import { amountInCents, boliviaDateTime, conditionAmounts, conditions, money, nextConditionAction, towerStage } from './model.ts'
 
 test('conserva centavos y rechaza importes con más de dos decimales', () => {
   assert.equal(amountInCents('6000,05'), 600005)
@@ -40,9 +40,10 @@ test('visualiza los netos de un reparto y mantiene los importes íntegros en con
 })
 
 test('el plano incorpora una condición confirmada y conserva el estado esquemático ante una devolución', () => {
-  const documentation = { idx: 0, status: 'released', toSeller: 592800 }
-  assert.equal(towerStage([{ idx: 0, status: 'submitted' }]), 'planned')
-  assert.equal(towerStage([documentation, { idx: 1, status: 'refunded', toBuyer: 592800 }]), 'documented')
-  assert.equal(towerStage([documentation, { idx: 1, status: 'resolved', toBuyer: 0, toSeller: 592800 }]), 'started')
-  assert.equal(towerStage([documentation, { idx: 1, status: 'resolved', toBuyer: 300000, toSeller: 292800 }]), 'documented')
+  const documentation = { ...conditions[0], status: 'released', toSeller: 592800 }
+  assert.equal(towerStage([{ ...conditions[0], status: 'submitted' }]), 'planned')
+  assert.equal(towerStage([documentation, { ...conditions[1], status: 'refunded', toBuyer: 592800 }]), 'documented')
+  assert.equal(towerStage([{ ...conditions[1], status: 'resolved', toBuyer: 0, toSeller: 592800 }, documentation]), 'started')
+  assert.equal(towerStage([documentation, { ...conditions[1], status: 'resolved', toBuyer: 300000, toSeller: 292800 }]), 'documented')
+  assert.equal(towerStage([{ title: 'Conexión de agua', condition: 'Presentar recibo.', status: 'approved' }]), 'planned')
 })

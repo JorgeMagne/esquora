@@ -82,6 +82,10 @@ export const eventLabels: Record<string, string> = {
   refund_accepted: 'Devolución aceptada', refund_rejected: 'Devolución rechazada', refunded: 'Dinero devuelto',
   refund_responded: 'Respuesta a la devolución',
   refund_response_expired: 'Venció el plazo para responder la devolución',
+  resolution_proposed: 'Instrucción de resolución presentada',
+  resolution_signed: 'Reparto firmado',
+  resolution_verified: 'Instrucción verificada por ESQUORA',
+  resolution_objected: 'Instrucción observada',
   disputed: 'Desacuerdo abierto', dispute_opened: 'Desacuerdo abierto', resolved: 'Desacuerdo resuelto',
   closed: 'Operación finalizada', objected: 'Documentos observados', declined: 'Acuerdo rechazado',
   cancelled: 'Invitación retirada', probe_rejected: 'Protección comprobada',
@@ -106,11 +110,13 @@ export function conditionAmounts(tranche: SettlementView & { amount: number }):
 
 export type TowerStage = 'planned' | 'documented' | 'started'
 
-export function towerStage(tranches: (SettlementView & { idx: number })[]): TowerStage {
+export function towerStage(tranches: (SettlementView & { title: string; condition: string })[]): TowerStage {
   const completed = (tranche: SettlementView) => tranche.status === 'approved' || tranche.status === 'released' ||
     (tranche.status === 'resolved' && (tranche.toSeller ?? 0) > 0 && !tranche.toBuyer)
-  if (tranches.some((tranche) => tranche.idx === 1 && completed(tranche))) return 'started'
-  return tranches.some((tranche) => tranche.idx === 0 && completed(tranche)) ? 'documented' : 'planned'
+  const completedTemplate = (template: (typeof conditions)[number]) => tranches.some((tranche) =>
+    tranche.title === template.title && tranche.condition === template.condition && completed(tranche))
+  if (completedTemplate(conditions[1])) return 'started'
+  return completedTemplate(conditions[0]) ? 'documented' : 'planned'
 }
 
 export function nextConditionAction(role: Role, condition: {
