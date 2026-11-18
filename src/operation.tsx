@@ -5,7 +5,7 @@ import { Link, useNavigate, useParams } from 'react-router'
 import { canOpenConditionDispute } from '../shared/conditions.ts'
 import { netAfterFees, TW_FEE_BPS } from '../shared/fees.ts'
 import {
-  conditionPath, invitationPath, operationPath, paymentPath, read, readOperation, resolverInvitationPath, uploadFile, useSession, write,
+  conditionPath, depositInProgress, invitationPath, operationPath, paymentPath, read, readOperation, resolverInvitationPath, uploadFile, useSession, write,
   type ActionInput, type DepositOrder, type Evidence, type Operation, type ProjectDetail, type ResolutionMode, type Tranche,
 } from './api.ts'
 import { amountInCents, conditionAmounts, conditionLabels, formatDate, money, nextConditionAction, numberAmount, operationLabels, requirementGuide, towerStage } from './model.ts'
@@ -62,7 +62,7 @@ function DepositReview({ operation }: { operation: Operation }) {
   const { id, project, unit, deposit, depositOrder } = operation
   const task = useWork()
   const navigate = useNavigate()
-  const pending = depositOrder?.status === 'paid'
+  const pending = depositOrder && depositInProgress(depositOrder.status)
   const paymentUrl = (orderId: string) => paymentPath(orderId) + '?operacion=' + encodeURIComponent(id)
 
   return <div className="deposit-review">
@@ -231,7 +231,7 @@ function Agreement({ operation, fromOperation = false }: { operation: Operation;
           {operation.declineReason && 'Motivo del rechazo: ' + operation.declineReason}
         </Feedback>
         {status === 'deploying' && <Loading>Confirmando el acuerdo…</Loading>}
-        {operation.depositOrder?.status === 'paid' && <Loading>Confirmando el depósito…</Loading>}
+        {depositInProgress(operation.depositOrder?.status) && <Loading>Confirmando el depósito…</Loading>}
         {sellerDraft && resolverChanged && <p className="muted">Guarda el cambio de resolución antes de enviar el acuerdo.</p>}
         {canAccept && user?.walletStatus !== 'active' && <ActionLink to={'/cuenta?volver=' + encodeURIComponent(operationPath(id))}>Activar mi cuenta</ActionLink>}
         {(canSend || (canAccept && user?.walletStatus === 'active')) && (canSign ?

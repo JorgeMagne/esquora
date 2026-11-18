@@ -4,7 +4,7 @@ import {
   HttpError, logEvent, opById, participants, push, trancheById, tranchesOf, userById,
   type ActionKind, type ChainTxRow, type DepositRow, type OpRow,
 } from './domain.ts'
-import { ADDRESSES, stroopsToCents, type AssetTransfer } from './stellar.ts'
+import { ADDRESSES, ChainError, stroopsToCents, type AssetTransfer } from './stellar.ts'
 import {
   buildDeploy, buildFund, findTransaction, findTransactionInHorizon, inspectEnvelope, readEscrow, readEscrowHistory, signService, submitEnvelope,
   submitProbeEnvelope,
@@ -309,18 +309,41 @@ export function deployOperation(op: OpRow, actorId: string, signature: string) {
   })
 }
 
-export function payOrder(op: OpRow, order: DepositRow) {
+export function processQueuedDeposit(id: string) {
   return runExclusive('service:anchor', async () => {
-    await serviceReady(ADDRESSES.anchor)
-    const xdr = await buildFund(op.escrow_contract_id!, order.amount)
-    const signed = signService(xdr, 'anchor')
-    const action = inTransaction(() => {
-      const row = prepareAction({ kind: 'fund', xdr, source: ADDRESSES.anchor, opId: op.id, depositId: order.id, userId: order.user_id })
-      persistSubmission(row, signed)
-      run("UPDATE deposits SET status = 'paid', paid_at = ?, tx_hash = ?, error = NULL WHERE id = ?", now(), row.hash, order.id)
-      return row
+    const order = get<DepositRow>("SELECT * FROM deposits WHERE id = ? AND status = 'queued'", id)
+    if (!order) return
+    await runExclusive('op:' + order.op_id, async () => {
+      const initial = opById(order.op_id)!
+      try {
+        try {
+          await serviceReady(ADDRESSES.anchor)
+        } catch (error) {
+          if (error instanceof HttpError && error.status === 409) return
+          throw error
+        }
+        const snapshot = await reconcileOperation(order.op_id)
+        if (!snapshot) throw new HttpError(503, 'No pudimos comprobar el saldo en Stellar. Intenta de nuevo en un momento.')
+        const op = opById(order.op_id)!
+        if (op.status !== 'awaiting_deposit' || !op.escrow_contract_id || BigInt(snapshot.heldStroops) > 0n) {
+          throw new HttpError(409, 'Ya hay fondos en esta operación o dejó de esperar un depósito. Revisa el estado de tu compra.')
+        }
+        const xdr = await buildFund(op.escrow_contract_id, order.amount)
+        const signed = signService(xdr, 'anchor')
+        const action = inTransaction(() => {
+          const row = prepareAction({ kind: 'fund', xdr, source: ADDRESSES.anchor, opId: op.id, depositId: order.id, userId: order.user_id })
+          persistSubmission(row, signed)
+          run("UPDATE deposits SET status = 'paid', paid_at = ?, tx_hash = ?, error = NULL WHERE id = ?", now(), row.hash, id)
+          return row
+        })
+        await sendPersisted(action, signed)
+      } catch (error) {
+        const message = error instanceof HttpError || error instanceof ChainError ? error.message :
+          'El banco de prueba no pudo preparar el depósito. Puedes volver a intentarlo.'
+        if (!run("UPDATE deposits SET status = 'failed', error = ? WHERE id = ? AND status = 'queued'", message, id).changes) throw error
+        push(participants(initial), { type: 'op', id: initial.id })
+      }
     })
-    return sendPersisted(action, signed)
   })
 }
 
@@ -385,6 +408,9 @@ export async function reconcileQueue() {
   if (checkingQueue) return
   checkingQueue = true
   try {
+    for (const order of all<{ id: string }>("SELECT id FROM deposits WHERE status = 'queued' ORDER BY created_at")) {
+      await processQueuedDeposit(order.id).catch(() => undefined)
+    }
     const operations = all<{ id: string }>("SELECT DISTINCT op_id AS id FROM chain_txs WHERE op_id IS NOT NULL AND status = 'pending'")
     for (const op of operations) await syncOperation(op.id).catch(() => undefined)
     const withdrawals = all<ChainTxRow>("SELECT * FROM chain_txs WHERE op_id IS NULL AND status = 'pending'")

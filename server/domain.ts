@@ -137,7 +137,7 @@ export interface DepositRow {
   rate: number
   amount_bob: number
   reference: string
-  status: 'pending' | 'paid' | 'settled' | 'failed'
+  status: 'pending' | 'queued' | 'paid' | 'settled' | 'failed'
   expires_at: string
   paid_at: string | null
   tx_hash: string | null
@@ -337,8 +337,8 @@ export function todoFor(op: OpRow, tranches: TrancheRow[], role: Role): string |
   }
   if (role === 'buyer' && op.status === 'invited') return 'Revisa y acepta el acuerdo'
   if (role === 'buyer' && op.status === 'awaiting_deposit') {
-    const paid = get("SELECT 1 FROM deposits WHERE op_id = ? AND status = 'paid' LIMIT 1", op.id)
-    return paid ? 'Confirmando el depósito' : 'Deposita la cuota inicial'
+    const processing = get("SELECT 1 FROM deposits WHERE op_id = ? AND status IN ('queued','paid') LIMIT 1", op.id)
+    return processing ? 'Confirmando el depósito' : 'Deposita la cuota inicial'
   }
   if (op.status !== 'funded') return null
   for (const t of tranches) {
@@ -403,6 +403,11 @@ export function serializeOpSummary(op: OpRow, role: Role) {
   }
 }
 
+export function currentDepositOrder(opId: string) {
+  return get<DepositRow>(`SELECT * FROM deposits WHERE op_id = ? AND status IN ('pending','failed','queued','paid')
+    ORDER BY (status IN ('queued','paid')) DESC, created_at DESC LIMIT 1`, opId)
+}
+
 export function serializeOp(op: OpRow, viewer: UserRow) {
   const role = roleOf(op, viewer.id)!
   const tranches = tranchesOf(op.id)
@@ -414,10 +419,7 @@ export function serializeOp(op: OpRow, viewer: UserRow) {
     `SELECT e.id, e.type, e.data_json, e.tx_hash, e.created_at, e.actor_id FROM events e WHERE e.op_id = ? ORDER BY e.id DESC LIMIT 200`,
     op.id,
   )
-  const order =
-    role === 'buyer'
-      ? get<any>("SELECT * FROM deposits WHERE op_id = ? AND status IN ('pending','paid','failed') ORDER BY created_at DESC LIMIT 1", op.id)
-      : null
+  const order = role === 'buyer' ? currentDepositOrder(op.id) : null
 
   return {
     id: op.id,
@@ -456,7 +458,7 @@ export function serializeOp(op: OpRow, viewer: UserRow) {
     platformFeeAccount: ADDRESSES.fees,
     totals: totalsOf(op, tranches),
     todo: todoFor(op, tranches, role),
-    depositOrder: order && (order.status === 'paid' || Date.parse(order.expires_at) > Date.now()) ? serializeOrder(order) : null,
+    depositOrder: order && (order.status === 'queued' || order.status === 'paid' || Date.parse(order.expires_at) > Date.now()) ? serializeOrder(order) : null,
     tranches: tranches.map((t) => {
       const rows = all<{ req_key: string; file_id: string; created_at: string; version_hash: string | null; is_current: number }>(
         'SELECT req_key, file_id, created_at, version_hash, is_current FROM evidence WHERE tranche_id = ? ORDER BY created_at DESC', t.id)

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowRight, Landmark } from 'lucide-react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
-import { api, ApiError, operationPath, paymentPath, useSession, write, type DepositOrder } from './api.ts'
+import { api, ApiError, depositInProgress, operationPath, paymentPath, useSession, write, type DepositOrder } from './api.ts'
 import { formatDate, money } from './model.ts'
 import { ProtectionPlan } from './plans.tsx'
 import { ActionLink, Amount, Back, ExplorerLink, Feedback, Loading, useWork } from './ui.tsx'
@@ -11,6 +11,7 @@ import './payment.css'
 const bolivianRate = new Intl.NumberFormat('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 4 })
 const paymentHeadings = {
   review: 'Pagar cuota inicial',
+  queued: 'Preparando el depósito',
   processing: 'Confirmando el depósito',
   settled: 'Depósito confirmado',
   expired: 'Cotización vencida',
@@ -18,8 +19,8 @@ const paymentHeadings = {
   check: 'Comprueba el estado',
 }
 
-const paymentPending = (status?: string) => ['paid', 'pending_confirmation', 'confirming'].includes(status ?? '')
 const quoteExpired = (order: DepositOrder) => order.expired || Date.parse(order.expiresAt) <= Date.now()
+const requestTimeout = 10_000
 
 export function Bank() {
   const { id = '' } = useParams()
@@ -35,11 +36,11 @@ export function Bank() {
   const path = '/anchor/orders/' + encodeURIComponent(id)
   const order = useQuery({
     queryKey: [path],
-    queryFn: ({ signal }) => api<DepositOrder>(path, { signal }),
+    queryFn: ({ signal }) => api<DepositOrder>(path, { signal: AbortSignal.any([signal, AbortSignal.timeout(requestTimeout)]) }),
     refetchInterval: ({ state }) => {
       const current = state.data
       if (!current || current.status === 'settled') return false
-      if (paymentPending(current.status)) return 2400
+      if (depositInProgress(current.status)) return 2400
       if (quoteExpired(current)) return false
       return Math.min(15000, Math.max(250, Date.parse(current.expiresAt) - Date.now()))
     },
@@ -47,17 +48,24 @@ export function Bank() {
   const data = order.data
   const operationId = data?.opId || params.get('operacion')
   const back = operationId ? operationPath(operationId) : '/'
-  const stage = data?.status === 'settled' ? 'settled' : paymentPending(data?.status) ? 'processing' :
+  const stage = data?.status === 'settled' ? 'settled' : data?.status === 'queued' ? 'queued' : depositInProgress(data?.status) ? 'processing' :
     id === needsCheck ? 'check' : data && (id === expired || quoteExpired(data)) ? 'expired' :
       data?.status === 'failed' ? 'failed' : 'review'
   const canPay = stage === 'review' || stage === 'failed'
   const canRenew = stage === 'expired' && session.data?.user?.kind === 'buyer' && !!data?.opId
+  const waitingForDeposit = stage === 'queued' || stage === 'processing'
 
   useEffect(() => {
     if (!focusAfterPayment.current || stage === 'review') return
     title.current?.focus()
-    if (stage !== 'processing') focusAfterPayment.current = false
+    if (stage !== 'queued' && stage !== 'processing') focusAfterPayment.current = false
   }, [stage])
+
+  useEffect(() => {
+    if (data?.status !== 'settled' && data?.status !== 'failed') return
+    void query.invalidateQueries({ queryKey: ['/ops'] })
+    if (operationId) void query.invalidateQueries({ queryKey: ['/ops/' + operationId] })
+  }, [data?.status, operationId, query])
 
   async function pay() {
     if (!data || !canPay) return
@@ -68,7 +76,7 @@ export function Bank() {
     }
     await query.cancelQueries({ queryKey: [path], exact: true })
     try {
-      const updated = await write<DepositOrder>(path + '/pay')
+      const updated = await api<DepositOrder>(path + '/pay', { method: 'POST', signal: AbortSignal.timeout(requestTimeout) })
       query.setQueryData<DepositOrder>([path], (previous) => ({ ...data, ...previous, ...updated }))
       void query.invalidateQueries({ queryKey: ['/ops'] })
       if (operationId) void query.invalidateQueries({ queryKey: ['/ops/' + operationId] })
@@ -77,9 +85,13 @@ export function Bank() {
         setExpired(id)
         return
       }
+      const needsVerification = !(error instanceof ApiError) || error.status >= 500
+      if (needsVerification) setNeedsCheck(id)
       const refreshed = await order.refetch()
-      if (refreshed.data?.status === 'settled' || paymentPending(refreshed.data?.status)) return
-      if (refreshed.isError && (!(error instanceof ApiError) || error.status >= 500)) setNeedsCheck(id)
+      if (!refreshed.isError && (refreshed.data?.status === 'settled' || depositInProgress(refreshed.data?.status))) {
+        setNeedsCheck('')
+        return
+      }
       throw error
     }
   }
@@ -118,14 +130,16 @@ export function Bank() {
             <div><dt>Vigente hasta</dt><dd><time dateTime={data.expiresAt}>{formatDate(data.expiresAt, true).replace(/(\d{1,2}:\d{2})\s+([ap]\.)\s+(m\.)/, '$1\u00a0$2\u00a0$3')}</time> (Bolivia)</dd></div>
             {data.beneficiary && <div><dt>Desarrollador</dt><dd>{data.beneficiary}</dd></div>}
           </>}
-          {(stage === 'settled' || stage === 'processing' || stage === 'check') && <div><dt>Referencia</dt><dd>{data.reference}</dd></div>}
+          {(stage === 'settled' || waitingForDeposit || stage === 'check') && <div><dt>Referencia</dt><dd>{data.reference}</dd></div>}
         </dl>
         <div className="payment-actions">
           {stage === 'settled' ? <>
             <ActionLink to={back}>Volver a mi compra</ActionLink>
             <ExplorerLink base={session.data?.config.explorerUrl} hash={data.txHash}>Ver comprobante público</ExplorerLink>
-          </> : stage === 'processing' ? <>
-            <p className="payment-note" role="status">Puedes volver a tu compra. El depósito aparecerá allí cuando la red lo confirme.</p>
+          </> : waitingForDeposit ? <>
+            <p className="payment-note" role="status">{stage === 'queued' ?
+              'El banco de prueba recibió la orden. El estado se actualizará automáticamente.' :
+              'El depósito se envió a Stellar. Puedes esperar aquí o volver a tu compra.'}</p>
             {order.isRefetchError && <Feedback error="No pudimos consultar el estado del depósito." onRetry={() => void order.refetch()} />}
           </> :
             stage === 'expired' ? <>
@@ -141,13 +155,14 @@ export function Bank() {
                 setNeedsCheck('')
               })}>{task.busy ? 'Consultando…' : 'Comprobar estado'}<ArrowRight size={18} aria-hidden="true" /></button>
             </> : <>
-              <p className="payment-note">{stage === 'failed' ? 'Puedes volver a intentar con esta cotización.' : 'El pago se simula con fondos de prueba.'}</p>
+              <p className="payment-note">{stage === 'failed' ? data.error || 'Puedes volver a intentar con esta cotización.' :
+                'El pago se simula con fondos de prueba.'}</p>
               <button className="button primary" type="button" disabled={task.busy} onClick={() => void task.run(pay)}>
                 {task.busy ? 'Enviando simulación…' : stage === 'failed' ? 'Reintentar pago simulado' : 'Simular pago bancario'}<ArrowRight size={18} aria-hidden="true" />
               </button>
               {task.busy && <span className="payment-visually-hidden" role="status">Enviando el pago de prueba.</span>}
             </>}
-          {stage !== 'settled' && stage !== 'processing' && <Feedback error={task.error} />}
+          {stage !== 'settled' && !waitingForDeposit && <Feedback error={task.error} />}
         </div>
       </div>
     </div>}

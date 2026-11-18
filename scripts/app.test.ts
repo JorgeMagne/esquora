@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { after, test } from 'node:test'
 import { promisify } from 'node:util'
-import { Account, Keypair, Networks, Operation, TransactionBuilder } from '@stellar/stellar-sdk'
+import { Account, Keypair, Networks, Operation, StrKey, TransactionBuilder, rpc } from '@stellar/stellar-sdk'
 
 const dataDir = await mkdtemp(join(tmpdir(), 'esquora-api-test-'))
 const testToken = 'esquora-local-fixture-token-never-use-online'
@@ -17,7 +17,7 @@ process.env.HORIZON_URL = 'https://127.0.0.1:1'
 process.env.APP_URL = 'http://127.0.0.1:8787'
 
 const { app } = await import('../server/app.ts')
-const { prepareAction } = await import('../server/chain.ts')
+const { prepareAction, syncOperation } = await import('../server/chain.ts')
 const { db } = await import('../server/db.ts')
 const { notifyExpiredRefunds, subscribe } = await import('../server/domain.ts')
 
@@ -293,6 +293,43 @@ test('protege el cobro confirmado, las órdenes de pago y los avisos de vencimie
     } finally {
       updateOrder.run('settled')
       updateOperation.run('funded')
+    }
+  })
+
+  await t.test('el banco acepta una sola vez y permite consultar la orden mientras Stellar tarda', async (context) => {
+    let releaseNetwork!: () => void
+    const network = new Promise<void>((resolve) => { releaseNetwork = resolve })
+    context.mock.method(rpc.Server.prototype, 'getAccount', async () => {
+      await network
+      throw new Error('Red fuera de servicio en esta prueba')
+    })
+    db.prepare("UPDATE operations SET status = 'awaiting_deposit', escrow_contract_id = ? WHERE id = 'review-op'")
+      .run(StrKey.encodeContract(Buffer.alloc(32, 1)))
+    db.prepare("UPDATE deposits SET status = 'pending', expires_at = ? WHERE id = 'review-order'")
+      .run(new Date(Date.now() + 60_000).toISOString())
+    const url = '/api/anchor/orders/review-order'
+    const payment = Promise.resolve(request(url + '/pay', 'POST', {}, headers(buyer)))
+    try {
+      const quick = (response: Response | Promise<Response>) => new Promise<Response>((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('El banco quedó esperando a Stellar')), 1000)
+        void Promise.resolve(response).then(resolve, reject).finally(() => clearTimeout(timeout))
+      })
+      const accepted = await quick(payment)
+      assert.equal(accepted.status, 202)
+      assert.equal((await accepted.json()).status, 'queued')
+      const repeated = await quick(request(url + '/pay', 'POST', {}, headers(buyer)))
+      assert.equal(repeated.status, 202)
+      assert.equal((await repeated.json()).id, 'review-order')
+      const order = await quick(request(url, 'GET', undefined, headers(buyer)))
+      assert.equal((await order.json()).status, 'queued')
+      const operation = await quick(request('/api/ops/review-op', 'GET', undefined, headers(buyer)))
+      assert.equal((await operation.json()).depositOrder.status, 'queued')
+    } finally {
+      releaseNetwork()
+      await payment.catch(() => undefined)
+      await syncOperation('review-op')
+      db.prepare("UPDATE operations SET status = 'funded', escrow_contract_id = 'review-stub-contract' WHERE id = 'review-op'").run()
+      db.prepare("UPDATE deposits SET status = 'settled', expires_at = ?, error = NULL WHERE id = 'review-order'").run(timestamp)
     }
   })
 

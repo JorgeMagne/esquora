@@ -48,6 +48,7 @@ export type DepositOrder = {
   status: string; expiresAt: string; expired?: boolean; error?: string | null; txHash?: string | null;
   beneficiary?: string; concept?: string; paymentUrl?: string;
 }
+export const depositInProgress = (status?: string) => ['queued', 'paid', 'pending_confirmation', 'confirming'].includes(status ?? '')
 export type Invitation = {
   opId: string; code: string; project: Pick<Project, 'name' | 'city'>; unit: string; unitDetail?: string | null; deposit: number; price: number;
   sellerName: string; claimed: boolean; mine: boolean; status: string;
@@ -114,7 +115,7 @@ export function readOperation(id: string) {
     refetchInterval: (query) => {
       const operation = query.state.data
       if (!operation) return false
-      if (operation.status === 'deploying' || operation.depositOrder?.status === 'paid' ||
+      if (operation.status === 'deploying' || depositInProgress(operation.depositOrder?.status) ||
         operation.tranches.some((tranche) => tranche.pendingAction?.status === 'pending')) return 3500
       if (operation.status === 'draft' && operation.role === 'seller' && operation.resolutionMode === 'external' && !operation.resolverReady) return 6000
       return false

@@ -19,11 +19,11 @@ import { ADDRESSES, ChainError, USDC, accountInfo, buildWithdrawXdr, ensureUserA
 import { buildMilestoneAction, buildProbe, readEscrow } from './tw.ts'
 import { PollarError, type Identity, verifyAgreementSignature, verifyPollarToken } from './pollar.ts'
 import {
-  actionById, assertNoPending, deployOperation, invalidateArmed, payOrder, prepareAction, refreshAction,
+  actionById, assertNoPending, deployOperation, invalidateArmed, prepareAction, processQueuedDeposit, refreshAction,
   runExclusive, submitAction, syncOperation, type ActionData,
 } from './chain.ts'
 import {
-  arbiterHasCase, buildTerms, fileMeta, HttpError, isOverdue, logEvent, opById, participants,
+  arbiterHasCase, buildTerms, currentDepositOrder, fileMeta, HttpError, isOverdue, logEvent, opById, participants,
   push, refundWindowPassed, roleOf, serializeAction, serializeAgreementTerms, serializeOp, serializeOpSummary, serializeOrder,
   subscribe, totalsOf, trancheById, tranchesOf, userById, type ChainTxRow, type DepositRow,
   type OpRow, type ResolutionMode, type UserRow,
@@ -577,7 +577,8 @@ app.get('/api/ops/:id', auth, async (c) => {
   const u = c.get('user')
   const id = c.req.param('id') ?? ''
   loadOp(u, id)
-  await syncOperation(id)
+  const order = currentDepositOrder(id)
+  if (order?.status !== 'queued' && order?.status !== 'paid') await syncOperation(id)
   return c.json(serializeOp(loadOp(u, id).op, u))
 })
 
@@ -734,8 +735,10 @@ app.post('/api/ops/:id/deposit', auth, (c) => {
   const u = c.get('user')
   const { op, role } = loadOp(u, c.req.param('id') ?? '')
   if (role !== 'buyer' || op.status !== 'awaiting_deposit') throw new HttpError(409, 'Esta operación no espera un depósito.')
-  const existing = get<DepositRow>("SELECT * FROM deposits WHERE op_id = ? AND status IN ('pending','paid','failed') ORDER BY created_at DESC LIMIT 1", op.id)
-  if (existing && (existing.status === 'paid' || Date.parse(existing.expires_at) > Date.now())) return c.json(serializeOrder(existing))
+  const existing = currentDepositOrder(op.id)
+  if (existing && (existing.status === 'queued' || existing.status === 'paid' || Date.parse(existing.expires_at) > Date.now())) {
+    return c.json(serializeOrder(existing))
+  }
   const id = newId('dep')
   run(
     "INSERT INTO deposits (id, op_id, user_id, amount, rate, amount_bob, reference, status, expires_at, created_at) VALUES (?,?,?,?,?,?,?,'pending',?,?)",
@@ -751,13 +754,9 @@ function loadOrder(id: string, buyerId: string) {
   return order
 }
 
-app.get('/api/anchor/orders/:id', auth, async (c) => {
+app.get('/api/anchor/orders/:id', auth, (c) => {
   const buyerId = c.get('user').id
-  let order = loadOrder(c.req.param('id') ?? '', buyerId)
-  if (order.status === 'paid') {
-    await syncOperation(order.op_id)
-    order = loadOrder(order.id, buyerId)
-  }
+  const order = loadOrder(c.req.param('id') ?? '', buyerId)
   const op = opById(order.op_id)!
   const project = get<{ name: string }>('SELECT name FROM projects WHERE id = ?', op.project_id)!
   const seller = userById(op.seller_id)!
@@ -767,22 +766,29 @@ app.get('/api/anchor/orders/:id', auth, async (c) => {
   })
 })
 
-app.post('/api/anchor/orders/:id/pay', auth, async (c) => {
+app.post('/api/anchor/orders/:id/pay', auth, (c) => {
   const buyerId = c.get('user').id
-  const order = loadOrder(c.req.param('id') ?? '', buyerId)
-  if (order.status !== 'settled') await syncOperation(order.op_id)
-  return runExclusive('op:' + order.op_id, async () => {
-    const current = loadOrder(order.id, buyerId)
-    if (current.status === 'settled' || current.status === 'paid') return c.json(serializeOrder(current))
-    if (Date.parse(current.expires_at) < Date.now()) throw new HttpError(410, 'La cotización venció. Vuelve a ESQUORA para generar un nuevo pago.')
-    const op = opById(order.op_id)!
+  const id = c.req.param('id') ?? ''
+  const { order, queued } = inTransaction(() => {
+    const current = loadOrder(id, buyerId)
+    if (current.status === 'settled' || current.status === 'paid' || current.status === 'queued') {
+      return { order: current, queued: false }
+    }
+    if (Date.parse(current.expires_at) <= Date.now()) throw new HttpError(410, 'La cotización venció. Vuelve a ESQUORA para generar un nuevo pago.')
+    const op = opById(current.op_id)!
     if (op.status !== 'awaiting_deposit' || !op.escrow_contract_id) throw new HttpError(409, 'Esta operación ya no espera un depósito.')
     if ((op.held_on_chain ?? 0) > 0) throw new HttpError(409, 'Ya hay un depósito parcial en la red. Revisa la operación antes de continuar.')
-    const processing = get<DepositRow>("SELECT * FROM deposits WHERE op_id = ? AND status IN ('paid','settled') LIMIT 1", op.id)
+    const processing = get("SELECT 1 FROM deposits WHERE op_id = ? AND status IN ('queued','paid','settled') LIMIT 1", op.id)
     if (processing) throw new HttpError(409, 'Ya hay un pago para esta operación.')
-    await payOrder(op, current)
-    return c.json(serializeOrder(loadOrder(order.id, buyerId)))
+    run("UPDATE deposits SET status = 'queued', error = NULL WHERE id = ?", id)
+    return { order: loadOrder(id, buyerId), queued: true }
   })
+  if (queued) {
+    const op = opById(order.op_id)!
+    push(participants(op), { type: 'op', id: op.id })
+    void processQueuedDeposit(order.id).catch(() => console.error('La preparación del depósito se volverá a intentar.'))
+  }
+  return c.json(serializeOrder(order), order.status === 'settled' ? 200 : 202)
 })
 
 app.post('/api/tranches/:id/object', auth, async (c) => {
