@@ -4,11 +4,10 @@ import { ArrowRight, Plus, Trash2 } from 'lucide-react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router'
 import { netAfterFees } from '../shared/fees.ts'
 import {
-  invitationPath, operationPath, projectPath, read, uploadFile, write, type Invitation, type Operation,
+  invitationPath, operationPath, projectPath, read, uploadFile, useSession, write, type Invitation, type Operation,
   type OperationSummary, type Party, type Project, type ProjectDetail, type User,
 } from './api.ts'
 import { amountInCents, boliviaDateTime, conditions, formatDate, money, operationLabels } from './model.ts'
-import { useSession } from './session.tsx'
 import { ActionLink, Amount, Back, Empty, Feedback, Field, FileRow, Loading, RowLink, Submit, Title, TotalsStrip, Tower, useWork } from './ui.tsx'
 
 export function Home({ user }: { user: User }) {

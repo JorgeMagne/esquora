@@ -1,17 +1,17 @@
 import { lazy, StrictMode, Suspense, useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
-import { PollarProvider } from '@pollar/react'
 import { QueryClient, QueryClientProvider, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Bell, Building2, FolderOpen, ReceiptText, UserRound, WalletCards } from 'lucide-react'
-import { BrowserRouter, Link, Navigate, NavLink, Route, Routes, useLocation, useMatch, useSearchParams } from 'react-router'
+import { ArrowRight, Bell, Building2, FolderOpen, ReceiptText, UserRound, WalletCards } from 'lucide-react'
+import { BrowserRouter, Link, Navigate, NavLink, Outlet, Route, Routes, useLocation, useMatch, useSearchParams } from 'react-router'
 import type { ReactNode } from 'react'
-import { api, operationPath, read, type Notification, type OperationSummary, type User } from './api.ts'
+import { api, operationPath, read, useSession, type Notification, type OperationSummary, type User } from './api.ts'
 import { initials, operationLabels, roleNames } from './model.ts'
-import { Account, Login, SessionNotice, pollarClient, useSession } from './session.tsx'
 import { ActionLink, Brand, Empty, Feedback, Loading, RowLink, Title } from './ui.tsx'
-import '@pollar/react/styles.css'
 import './styles.css'
 
+const PollarSession = lazy(() => import('./session.tsx').then((module) => ({ default: module.PollarSession })))
+const Login = lazy(() => import('./session.tsx').then((module) => ({ default: module.Login })))
+const Account = lazy(() => import('./session.tsx').then((module) => ({ default: module.Account })))
 const Home = lazy(() => import('./workspace.tsx').then((module) => ({ default: module.Home })))
 const InvitationPage = lazy(() => import('./workspace.tsx').then((module) => ({ default: module.InvitationPage })))
 const ProjectNew = lazy(() => import('./workspace.tsx').then((module) => ({ default: module.ProjectNew })))
@@ -20,7 +20,7 @@ const OperationNew = lazy(() => import('./workspace.tsx').then((module) => ({ de
 const OperationPage = lazy(() => import('./operation.tsx').then((module) => ({ default: module.OperationPage })))
 const AgreementPage = lazy(() => import('./operation.tsx').then((module) => ({ default: module.AgreementPage })))
 const ConditionPage = lazy(() => import('./operation.tsx').then((module) => ({ default: module.ConditionPage })))
-const Bank = lazy(() => import('./records.tsx').then((module) => ({ default: module.Bank })))
+const Bank = lazy(() => import('./payment.tsx').then((module) => ({ default: module.Bank })))
 const Notifications = lazy(() => import('./records.tsx').then((module) => ({ default: module.Notifications })))
 const Receipts = lazy(() => import('./records.tsx').then((module) => ({ default: module.Receipts })))
 const VerificationPage = lazy(() => import('./records.tsx').then((module) => ({ default: module.VerificationPage })))
@@ -117,6 +117,13 @@ function AccountOnly({ user }: { user: User }) {
   </>
 }
 
+function SessionNotice({ user }: { user: User }) {
+  if (user.walletStatus === 'active') return null
+  return <div className="account-notice"><span>Activa tu cuenta para confirmar operaciones.</span>
+    <Link to="/cuenta">Ir a mi cuenta<ArrowRight size={15} aria-hidden="true" /></Link>
+  </div>
+}
+
 function ReceiptDirectory() {
   const operations = read<OperationSummary[]>('/ops')
   if (operations.isPending) return <Loading />
@@ -147,23 +154,28 @@ function App() {
   if (session.isError) return <Shell><Feedback error={session.error} onRetry={() => void session.refetch()} /></Shell>
 
   return <Routes>
-    <Route path="/pago/:id" element={<main className="bank-shell"><Suspense fallback={<Loading />}><Bank /></Suspense></main>} />
+    <Route path="/pago/:id" element={<main className="bank-shell"><Suspense fallback={<Loading />}>
+      <Protected user={user} kind="buyer"><Bank /></Protected>
+    </Suspense></main>} />
     <Route path="*" element={<Shell user={user}>
       <Routes>
-        <Route path="/entrar" element={<Login />} />
         <Route path="/invitacion/:token" element={<InvitationPage />} />
-        <Route path="/cuenta" element={user ? <AccountOnly key={user.id} user={user} /> :
-          <Navigate to={'/entrar?volver=' + encodeURIComponent(params.get('volver') || '/cuenta')} replace />} />
-        <Route path="/" element={user ? <Protected user={user}><SessionNotice user={user} /><Home user={user} /></Protected> : <Login />} />
+        <Route path="/" element={user ? <Protected user={user}><SessionNotice user={user} /><Home user={user} /></Protected> :
+          <PollarSession><Login /></PollarSession>} />
+        <Route element={<PollarSession><Outlet /></PollarSession>}>
+          <Route path="/entrar" element={<Login />} />
+          <Route path="/cuenta" element={user ? <AccountOnly key={user.id} user={user} /> :
+            <Navigate to={'/entrar?volver=' + encodeURIComponent(params.get('volver') || '/cuenta')} replace />} />
+          <Route path="/operaciones/:id" element={<Protected user={user}><OperationPage /></Protected>} />
+          <Route path="/operaciones/:id/acuerdo" element={<Protected user={user}><AgreementPage /></Protected>} />
+          <Route path="/operaciones/:id/condiciones/:trancheId" element={<Protected user={user}><ConditionPage /></Protected>} />
+          <Route path="/operaciones/:id/verificacion" element={<Protected user={user}><VerificationPage /></Protected>} />
+          <Route path="/saldo" element={<Protected user={user}><WalletPage /></Protected>} />
+        </Route>
         <Route path="/proyectos/nuevo" element={<Protected user={user} kind="developer"><ProjectNew /></Protected>} />
         <Route path="/proyectos/:id" element={<Protected user={user} kind="developer"><ProjectPage /></Protected>} />
         <Route path="/proyectos/:id/nueva-operacion" element={<Protected user={user} kind="developer"><OperationNew /></Protected>} />
-        <Route path="/operaciones/:id" element={<Protected user={user}><OperationPage /></Protected>} />
-        <Route path="/operaciones/:id/acuerdo" element={<Protected user={user}><AgreementPage /></Protected>} />
-        <Route path="/operaciones/:id/condiciones/:trancheId" element={<Protected user={user}><ConditionPage /></Protected>} />
         <Route path="/operaciones/:id/comprobantes" element={<Protected user={user}><Receipts /></Protected>} />
-        <Route path="/operaciones/:id/verificacion" element={<Protected user={user}><VerificationPage /></Protected>} />
-        <Route path="/saldo" element={<Protected user={user}><WalletPage /></Protected>} />
         <Route path="/comprobantes" element={<Protected user={user}><ReceiptDirectory /></Protected>} />
         <Route path="/avisos" element={<Protected user={user}><Notifications /></Protected>} />
         <Route path="*" element={<><Title>Esta página no está disponible</Title><ActionLink to="/">Volver al inicio</ActionLink></>} />
@@ -174,10 +186,8 @@ function App() {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <PollarProvider client={pollarClient}>
-      <QueryClientProvider client={queryClient}>
-        <BrowserRouter><App /></BrowserRouter>
-      </QueryClientProvider>
-    </PollarProvider>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter><App /></BrowserRouter>
+    </QueryClientProvider>
   </StrictMode>,
 )

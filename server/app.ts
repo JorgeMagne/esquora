@@ -6,6 +6,7 @@ import { bodyLimit } from 'hono/body-limit'
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 import { streamSSE } from 'hono/streaming'
 import { StrKey } from '@stellar/stellar-sdk'
+import { canOpenConditionDispute } from '../shared/conditions.ts'
 import {
   APP_URL, BOB_PER_USDC, EXPLORER_URL, HORIZON_URL, MAX_UPLOAD_BYTES, NETWORK_NAME,
   NETWORK_PASSPHRASE, PLATFORM_FEE_BPS, SECURE_COOKIES, SESSION_DAYS, TEST_AUTH_TOKEN, TW_FEE_BPS, UPLOAD_DIR,
@@ -622,17 +623,18 @@ app.post('/api/ops/:id/deposit', auth, (c) => {
   return c.json(serializeOrder(get<DepositRow>('SELECT * FROM deposits WHERE id = ?', id)!))
 })
 
-function loadOrder(id: string) {
+function loadOrder(id: string, buyerId: string) {
   const order = get<DepositRow>('SELECT * FROM deposits WHERE id = ?', id)
-  if (!order) throw new HttpError(404, 'No encontramos esa orden de pago.')
+  if (!order || order.user_id !== buyerId) throw new HttpError(404, 'No encontramos esa orden de pago.')
   return order
 }
 
-app.get('/api/anchor/orders/:id', async (c) => {
-  let order = loadOrder(c.req.param('id'))
+app.get('/api/anchor/orders/:id', auth, async (c) => {
+  const buyerId = c.get('user').id
+  let order = loadOrder(c.req.param('id') ?? '', buyerId)
   if (order.status === 'paid') {
     await syncOperation(order.op_id)
-    order = loadOrder(order.id)
+    order = loadOrder(order.id, buyerId)
   }
   const op = opById(order.op_id)!
   const project = get<{ name: string }>('SELECT name FROM projects WHERE id = ?', op.project_id)!
@@ -640,15 +642,15 @@ app.get('/api/anchor/orders/:id', async (c) => {
   return c.json({
     ...serializeOrder(order), expired: ['pending', 'failed'].includes(order.status) && Date.parse(order.expires_at) < Date.now(),
     concept: 'Cuota inicial · ' + project.name + ', ' + op.unit, beneficiary: seller.org_name ?? seller.name,
-    payer: op.buyer_name,
   })
 })
 
-app.post('/api/anchor/orders/:id/pay', async (c) => {
-  const order = loadOrder(c.req.param('id'))
+app.post('/api/anchor/orders/:id/pay', auth, async (c) => {
+  const buyerId = c.get('user').id
+  const order = loadOrder(c.req.param('id') ?? '', buyerId)
   if (order.status !== 'settled') await syncOperation(order.op_id)
   return runExclusive('op:' + order.op_id, async () => {
-    const current = loadOrder(order.id)
+    const current = loadOrder(order.id, buyerId)
     if (current.status === 'settled' || current.status === 'paid') return c.json(serializeOrder(current))
     if (Date.parse(current.expires_at) < Date.now()) throw new HttpError(410, 'La cotización venció. Vuelve a ESQUORA para generar un nuevo pago.')
     const op = opById(order.op_id)!
@@ -657,7 +659,7 @@ app.post('/api/anchor/orders/:id/pay', async (c) => {
     const processing = get<DepositRow>("SELECT * FROM deposits WHERE op_id = ? AND status IN ('paid','settled') LIMIT 1", op.id)
     if (processing) throw new HttpError(409, 'Ya hay un pago para esta operación.')
     await payOrder(op, current)
-    return c.json(serializeOrder(loadOrder(order.id)))
+    return c.json(serializeOrder(loadOrder(order.id, buyerId)))
   })
 })
 
@@ -755,7 +757,7 @@ async function armTranche(u: UserRow, id: string, kind: TrancheAction, b: Record
         throw new HttpError(409, 'La devolución está disponible al vencer la condición sin documentos confirmados.')
       }
     } else if (kind === 'dispute') {
-      if (role === 'arbiter' || !['submitted', 'objected', 'approved'].includes(t.status)) {
+      if (role === 'arbiter' || !canOpenConditionDispute(t.status)) {
         throw new HttpError(409, 'Esta condición no admite un desacuerdo en este momento.')
       }
       data = { reason: requireStr(b.reason, 'motivo del desacuerdo', 1000) }
@@ -866,10 +868,16 @@ app.post('/api/acciones/:id/enviar', auth, async (c) => {
   return runExclusive(lock, async () => {
     const action = loadAction(u, id)
     if (action.status === 'armed') {
-      if (action.tranche_id) assertNoPending(action.tranche_id)
-      if (action.kind === 'evidence' && action.tranche_id && isOverdue(trancheById(action.tranche_id)!)) {
-        invalidateArmed(action.tranche_id)
-        throw new HttpError(409, 'Venció el plazo para presentar los documentos de esta condición.')
+      if (action.tranche_id) {
+        assertNoPending(action.tranche_id)
+        const tranche = trancheById(action.tranche_id)!
+        if (action.kind === 'dispute' && !canOpenConditionDispute(tranche.status)) {
+          throw new HttpError(409, 'Esta condición ya no admite un desacuerdo.')
+        }
+        if (action.kind === 'evidence' && isOverdue(tranche)) {
+          invalidateArmed(action.tranche_id)
+          throw new HttpError(409, 'Venció el plazo para presentar los documentos de esta condición.')
+        }
       }
       if (get("SELECT 1 FROM chain_txs WHERE source = ? AND status = 'pending'", u.public_key)) {
         throw new HttpError(409, 'Otra acción está confirmándose en tu cuenta. Inténtalo en unos segundos.')
@@ -904,13 +912,16 @@ app.get('/api/notifications', auth, (c) => {
   const rows = all<any>(
     `SELECT e.id, e.type, e.data_json, e.created_at, e.actor_id, o.id AS op_id, o.code, o.unit, o.seller_id, o.buyer_id, o.arbiter_id
      FROM events e JOIN operations o ON o.id = e.op_id
-     WHERE (o.seller_id = ?1 OR (o.buyer_id = ?1 AND o.status != 'draft' AND e.type != 'created') OR o.arbiter_id = ?1)
+     WHERE ((o.seller_id = ?1 AND e.type != 'refund_response_expired')
+         OR (o.buyer_id = ?1 AND o.status != 'draft' AND e.type NOT IN ('created', 'refund_response_expired'))
+         OR (o.arbiter_id = ?1 AND e.type IN (
+           'dispute_opened', 'resolution_proposed', 'refund_requested', 'refund_responded', 'refund_response_expired', 'resolved', 'refunded'
+         )))
        AND (e.actor_id IS NULL OR e.actor_id != ?1)
-     ORDER BY e.id DESC LIMIT 60`,
+     ORDER BY e.id DESC LIMIT 30`,
     u.id,
   )
-  const visible = rows.filter((r) => r.arbiter_id !== u.id || ['dispute_opened', 'resolution_proposed', 'refund_requested', 'refund_responded', 'resolved', 'refunded'].includes(r.type))
-  const items = visible.slice(0, 30).map((r) => ({
+  const items = rows.map((r) => ({
     id: r.id,
     type: r.type,
     data: JSON.parse(r.data_json),

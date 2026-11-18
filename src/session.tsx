@@ -1,18 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { usePollar } from '@pollar/react'
+import { PollarClient } from '@pollar/core'
+import { PollarProvider, usePollar } from '@pollar/react'
 import { ArrowRight, LogOut, Mail, ShieldCheck } from 'lucide-react'
 import { Link, Navigate, useLocation, useSearchParams } from 'react-router'
-import { read, write, type Session, type User } from './api.ts'
+import { useSession, write, type Session, type User } from './api.ts'
 import { initials, roleNames, wait } from './model.ts'
 import { ActionLink, Feedback, Field, Loading, Submit, Title, Tower, useWork } from './ui.tsx'
+import '@pollar/react/styles.css'
 
-export const sessionKey = ['/me']
-export const pollarKey: string = import.meta.env.VITE_POLLAR_PUBLISHABLE_KEY || ''
-export const pollarClient = { apiKey: pollarKey, stellarNetwork: 'testnet' as const }
+const sessionKey = ['/me']
+const pollarKey: string = import.meta.env.VITE_POLLAR_PUBLISHABLE_KEY || ''
+const pollarClient = new PollarClient({ apiKey: pollarKey, stellarNetwork: 'testnet' })
 
-export function useSession() {
-  return read<Session>('/me')
+export function PollarSession({ children }: { children: ReactNode }) {
+  return <PollarProvider client={pollarClient}>{children}</PollarProvider>
 }
 
 export function safeReturn(path: string | null) {
@@ -234,11 +237,4 @@ export function Account({ user }: { user: User }) {
       </section>}
     </div>
   </>
-}
-
-export function SessionNotice({ user }: { user: User }) {
-  if (user.walletStatus === 'active') return null
-  return <div className="account-notice"><span>Activa tu cuenta para confirmar operaciones.</span>
-    <Link to="/cuenta">Ir a mi cuenta<ArrowRight size={15} aria-hidden="true" /></Link>
-  </div>
 }

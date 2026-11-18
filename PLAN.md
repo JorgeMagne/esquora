@@ -1,6 +1,6 @@
 # Plan de ejecución — pagos inmobiliarios asegurados sobre Stellar
 
-Versión 5, 17 de noviembre de 2026. Incorpora las dos evaluaciones del equipo, los resultados y el cierre de la fase 0 (2.1 y 7), la decisión del tercero como resolutor (3.1) y lo que hay que construir en la fase 1 (sección 8). Producto: **ESQUORA**.
+Versión 6, 17 de noviembre de 2026. Incorpora los resultados de la fase 0, la decisión sobre el tercero designado y el estado de implementación y validación de la fase 1. Producto: **ESQUORA**.
 Tecnología fijada por la propuesta: Stellar Testnet, Trustless Work V1 (escrow) y Pollar (acceso y billetera).
 
 Cada afirmación técnica lleva una de tres marcas:
@@ -181,8 +181,8 @@ Otras precisiones para el pitch:
 
 **El tercero designado es el único resolutor** (decidido el 17 nov, 3.1). El `disputeResolver` de cada escrow es la billetera Pollar del tercero.
 
-- **Devolución por plazo vencido.** El comprador pide la devolución, y eso abre el desacuerdo en la red (`dispute-milestone`, firmado por el comprador). El desarrollador tiene un plazo para responder en la app: acepta o rechaza con motivo; esto queda solo en la base de datos. Si acepta, el tercero ejecuta la devolución tal como la acordaron. Si rechaza o no responde a tiempo, el tercero decide.
-- **Desacuerdo.** Lo abre el comprador o el desarrollador. El tercero ve el acuerdo, los documentos y los motivos de cada parte, y ejecuta el reparto (`resolve-milestone-dispute`, firmado por el tercero; puede ser parcial).
+- **Devolución por plazo vencido.** El comprador pide la devolución y abre el desacuerdo en la red (`dispute-milestone`). El desarrollador tiene un plazo para responder en ESQUORA. Si acepta, el tercero ejecuta la devolución acordada. Si rechaza o no responde a tiempo, el tercero decide. Cuando vence el plazo sin respuesta, ESQUORA registra un aviso para el tercero y lo muestra en vivo si tiene una sesión abierta.
+- **Desacuerdo.** En ESQUORA, el comprador o el desarrollador puede abrirlo mientras los documentos estén en revisión u observados. La confirmación cierra esa opción y permite el cobro. El tercero ve el acuerdo, los documentos y los motivos de cada parte, indica expresamente el importe para el comprador y ejecuta el reparto (`resolve-milestone-dispute`).
 - **Toda firma de usuario es sobre su propia billetera**: el comprador confirma y abre desacuerdos, el desarrollador presenta evidencia y cobra, el tercero resuelve. Es el caso que S7 comprobó con Pollar. No hay solicitudes de firma compartidas que guardar ni rearmar.
 - **Vencimiento de ~100 s** de las transacciones que arma la API (S2): la app arma la transacción justo cuando la persona pulsa el botón, la firma y la envía en el mismo paso. Si venció mientras la ventana de Pollar estaba abierta, la rearma y vuelve a pedir la confirmación, explicándolo.
 
@@ -213,7 +213,7 @@ Pantalla de inicio de sesión: la ventana de Pollar está en inglés y lleva su 
 
 ### 4.7 Banco y proveedor financiero simulados
 
-Página separada, con otro estilo y el rótulo "entorno de pruebas". Al confirmar el pago, la cuenta del proveedor deposita en el escrow con `fund-escrow`. El retiro a banco es un pago real en Testnet hacia la cuenta del proveedor.
+Página separada, con otro estilo y el rótulo "entorno de pruebas". El comprador inicia sesión para consultar o pagar su propia orden. Al confirmar el pago, la cuenta del proveedor deposita en el escrow con `fund-escrow`. El retiro a banco es un pago real en Testnet hacia la cuenta del proveedor.
 
 ### 4.8 Consistencia entre la base de datos y la red
 
@@ -392,9 +392,9 @@ Para la app quedan cuatro hallazgos de Pollar: la plataforma debe enviar XLM ant
 
 ---
 
-## 8. Fase 1 — Qué hay que construir
+## 8. Fase 1 — Implementación y validación
 
-**Punto de partida.** El servidor (`server/`) es del modelo anterior: multifirma nativa y contraseñas con llaves cifradas. No tiene Trustless Work ni Pollar. La web (`src/`) está vacía. Hay una sola maqueta (`diseno/maquetas/compra.html`). Lo que sirve de la fase 0: `scripts/spikes/fase0.ts` (llamadas a Trustless Work y al contrato, compra de USDC en el pool) y `scripts/spikes/pollar-server.ts` (verificación del token, firma con Pollar y envío).
+**Estado actual.** El servidor (`server/`) y la interfaz (`src/`) implementan acceso con Pollar, acuerdos, depósitos, liberaciones, devoluciones y verificación en Stellar Testnet con Trustless Work. El flujo se probó en la red con una cuenta Pollar y dos firmantes de prueba. Quedan el despliegue HTTPS, la validación desde la interfaz con tres cuentas Pollar y la demo. Los bloques siguientes recogen el alcance y las pruebas de cierre.
 
 **Terminado de la fase 1:** la secuencia de la sección 1 se hace entera desde la interfaz, con tres cuentas Pollar (comprador, desarrollador y tercero) en tres navegadores, y cada monto en pantalla coincide al centavo con el explorador.
 

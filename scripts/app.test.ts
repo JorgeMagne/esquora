@@ -18,6 +18,7 @@ process.env.APP_URL = 'http://127.0.0.1:8787'
 
 const { app } = await import('../server/app.ts')
 const { db } = await import('../server/db.ts')
+const { notifyExpiredRefunds, subscribe } = await import('../server/domain.ts')
 
 after(async () => {
   db.close()
@@ -201,4 +202,82 @@ test('an invitation can be accepted only by the buyer identity named in the agre
   assert.equal(buyerProfile.status, 200)
   assert.equal((await request(invitePath, 'POST', {}, buyerHeaders)).status, 200)
   assert.equal((await request(`/api/ops/${draft.id}`, 'GET', undefined, buyerHeaders)).status, 200)
+})
+
+test('protege el cobro confirmado, las órdenes de pago y los avisos de vencimiento', async (t) => {
+  const seller = await login('review-seller')
+  const buyer = await login('review-buyer')
+  const arbiter = await login('review-arbiter')
+  const headers = (account: typeof buyer) => ({ Cookie: account.cookie })
+  async function user(account: typeof buyer, kind: string) {
+    const res = await request('/api/me', 'PATCH', {
+      kind, name: account.profile.name, orgName: 'Proyecto de prueba', orgNit: '123456',
+    }, headers(account))
+    assert.equal(res.status, 200)
+    db.prepare("UPDATE users SET wallet_status = 'active' WHERE public_key = ?").run(account.profile.publicKey)
+    return (await res.json()).user.id as string
+  }
+  const sellerId = await user(seller, 'developer')
+  const buyerId = await user(buyer, 'buyer')
+  const arbiterId = await user(arbiter, 'arbiter')
+  const timestamp = new Date().toISOString()
+  const past = '2000-01-01T00:00:00.000Z'
+  db.prepare("INSERT INTO projects (id,owner_id,name,city,address,created_at) VALUES ('review-project',?,'Proyecto','Ciudad','Dirección',?)")
+    .run(sellerId, timestamp)
+  db.prepare("INSERT INTO files (id,sha256,name,size,mime,uploaded_by,created_at) VALUES ('review-file',?,'Acuerdo',1,'text/plain',?,?)")
+    .run('a'.repeat(64), sellerId, timestamp)
+  db.prepare(`INSERT INTO operations (id,code,project_id,seller_id,buyer_id,buyer_email,buyer_name,arbiter_id,
+    unit,price,deposit,fee_bps,refund_response_hours,contract_file_id,contract_sha256,terms_json,terms_digest,
+    invite_token,status,escrow_contract_id,created_at)
+    VALUES ('review-op','REVIEW','review-project',?,?,?,'Comprador',?,'A-10',30000,15000,90,72,'review-file',?,
+      '{}',?,'review-invite','funded','review-stub-contract',?)`)
+    .run(sellerId, buyerId, buyer.profile.email, arbiterId, 'a'.repeat(64), 'b'.repeat(64), timestamp)
+  const addCondition = db.prepare(`INSERT INTO tranches
+    (id,op_id,idx,title,condition,requirements_json,amount,due_at,status,refund_requested_at,refund_response)
+    VALUES (?,'review-op',?,'Condición','Presentar documentos','[]',5000,?,?,?,?)`)
+  addCondition.run('review-approved', 0, past, 'approved', null, null)
+  addCondition.run('review-expired', 1, past, 'refund_requested', past, null)
+  addCondition.run('review-future', 2, past, 'refund_requested', timestamp, null)
+  addCondition.run('review-responded', 3, past, 'refund_requested', past, 'rejected')
+  db.prepare(`INSERT INTO deposits (id,op_id,user_id,amount,rate,amount_bob,reference,status,expires_at,created_at)
+    VALUES ('review-order','review-op',?,15000,11.7,175500,'REF','settled',?,?)`).run(buyerId, timestamp, timestamp)
+
+  await t.test('una condición confirmada no admite un desacuerdo, ni uno preparado antes', async () => {
+    const creation = await request('/api/acciones', 'POST', {
+      kind: 'dispute', trancheId: 'review-approved', reason: 'Motivo de prueba',
+    }, headers(buyer))
+    assert.equal(creation.status, 409, await creation.text())
+    db.prepare(`INSERT INTO chain_txs (id,op_id,tranche_id,kind,xdr,source,status,hash,created_by,created_at)
+      VALUES ('review-action','review-op','review-approved','dispute','stub',?,'armed',?,?,?)`)
+      .run(buyer.profile.publicKey, 'c'.repeat(64), buyerId, timestamp)
+    const stale = await request('/api/acciones/review-action/enviar', 'POST', { signedXdr: 'stub' }, headers(buyer))
+    assert.equal(stale.status, 409, await stale.text())
+  })
+
+  await t.test('solo el dueño de la orden autenticado puede consultar o pagar', async () => {
+    for (const [method, path] of [['GET', '/api/anchor/orders/review-order'], ['POST', '/api/anchor/orders/review-order/pay']]) {
+      assert.equal((await request(path, method)).status, 401)
+      assert.equal((await request(path, method, undefined, headers(seller))).status, 404)
+      assert.equal((await request(path, method, undefined, headers(buyer))).status, 200)
+    }
+  })
+
+  await t.test('el tercero recibe un solo aviso por un plazo vencido sin respuesta', async () => {
+    const messages: unknown[] = []
+    const unsubscribe = subscribe(arbiterId, (message) => messages.push(message))
+    try {
+      notifyExpiredRefunds()
+      notifyExpiredRefunds()
+      const arbiterNotices = await request('/api/notifications', 'GET', undefined, headers(arbiter))
+      const { items, unread } = await arbiterNotices.json()
+      assert.equal(unread, 1)
+      assert.equal(items[0].type, 'refund_response_expired')
+      assert.equal(items[0].data.trancheId, 'review-expired')
+      assert.deepEqual(messages, [{ type: 'op', id: 'review-op' }])
+      const buyerNotices = await request('/api/notifications', 'GET', undefined, headers(buyer))
+      assert.equal((await buyerNotices.json()).unread, 0)
+    } finally {
+      unsubscribe()
+    }
+  })
 })

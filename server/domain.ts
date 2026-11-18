@@ -217,6 +217,26 @@ export function refundWindowPassed(op: OpRow, t: TrancheRow) {
   return Date.now() > Date.parse(t.refund_requested_at) + op.refund_response_hours * 3600_000
 }
 
+export function notifyExpiredRefunds() {
+  const checkedAt = now()
+  const events = all<{ op_id: string }>(
+    `INSERT INTO events (op_id, type, data_json, created_at)
+     SELECT o.id, 'refund_response_expired', json_object('trancheId', t.id, 'tranche', t.idx + 1), ?
+     FROM tranches t JOIN operations o ON o.id = t.op_id
+     WHERE o.status = 'funded' AND t.status = 'refund_requested' AND t.refund_response IS NULL
+       AND ROUND(unixepoch(t.refund_requested_at, 'subsec') * 1000) + o.refund_response_hours * 3600000 < ?
+       AND NOT EXISTS (
+         SELECT 1 FROM events e WHERE e.op_id = o.id AND e.type = 'refund_response_expired'
+           AND json_extract(e.data_json, '$.trancheId') = t.id
+       )
+     RETURNING op_id`,
+    checkedAt, Date.parse(checkedAt),
+  )
+  for (const opId of new Set(events.map(({ op_id }) => op_id))) {
+    push([opById(opId)!.arbiter_id], { type: 'op', id: opId })
+  }
+}
+
 export const feeFor = (op: OpRow, grossCents: number) => grossCents - netAfterFees(grossCents, op.fee_bps)
 
 // ───────────────────────── Acuerdo ─────────────────────────

@@ -25,4 +25,6 @@ El `Dockerfile` compila la web y sirve la API y la SPA desde el mismo proceso Ho
 
 La comprobación de salud es `GET /api/health`. Para levantar la compilación sin contenedor se puede ejecutar `npm run build` y `npm start` en un servidor con Node 22 y almacenamiento persistente. Si el proveedor reinicia Stellar Testnet, conserva el expediente y vuelve a crear las operaciones de prueba con las cuentas que se activen en la red actual.
 
+En Railway, despliega el `Dockerfile` con una réplica y adjunta un volumen en `/app/data`. Configura la comprobación de salud `/api/health`, genera el dominio del servicio y usa su URL `https://` en `APP_URL` y en los dominios autorizados de Pollar Testnet. El contenedor ajusta los permisos del volumen al arrancar y ejecuta Node con el usuario `node`. Para iniciar un entorno de demo limpio, deja que el servicio genere sus propias llaves de Stellar Testnet en el volumen.
+
 Consulta [PLAN.md](./PLAN.md) para los criterios de fase 1 y [DESIGN.md](./DESIGN.md) para la dirección visual.

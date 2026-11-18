@@ -266,17 +266,18 @@ async function run(base: string, token: string, restart?: () => Promise<void>) {
 
   const order = await api.json<PaymentView>(`${opUrl}/deposit`, { cookie: buyer.cookie, data: {} })
   const orderUrl = `/api/anchor/orders/${order.id}`
-  const paid = await api.json<PaymentView>(`${orderUrl}/pay`, { data: {} })
+  const paymentSession = { cookie: buyer.cookie }
+  const paid = await api.json<PaymentView>(`${orderUrl}/pay`, { ...paymentSession, data: {} })
   const settled = paid.status === 'settled'
     ? paid
-    : await poll('depositar la cuota inicial', () => api.json<PaymentView>(orderUrl), order => order.status === 'settled')
+    : await poll('depositar la cuota inicial', () => api.json<PaymentView>(orderUrl, paymentSession), order => order.status === 'settled')
   await assertTransaction(settled.txHash, true)
   const funded = await operation()
   assert.equal(funded.status, 'funded')
   assert.deepEqual(funded.totals, { held: DEPOSIT_CENTS, released: 0, refunded: 0, fees: 0 })
   assert.deepEqual((await operation(developer.cookie)).totals, funded.totals)
   assert.equal((await api.request(opUrl, { cookie: arbiter.cookie })).status, 404)
-  const repeatedPayment = await api.json<PaymentView>(`${orderUrl}/pay`, { data: {} })
+  const repeatedPayment = await api.json<PaymentView>(`${orderUrl}/pay`, { ...paymentSession, data: {} })
   assert.equal(repeatedPayment.status, 'settled')
   assert.equal(repeatedPayment.txHash, settled.txHash)
   const simulated = await api.json<Probe>('/api/acciones', {

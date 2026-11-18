@@ -5,6 +5,7 @@ import { serveStatic } from '@hono/node-server/serve-static'
 import { PORT, ROOT, TEST_AUTH_TOKEN, validateConfig } from './config.ts'
 import { app } from './app.ts'
 import { reconcileQueue, recoverPending } from './chain.ts'
+import { notifyExpiredRefunds } from './domain.ts'
 import { bootstrap } from './stellar.ts'
 
 validateConfig()
@@ -24,7 +25,16 @@ if (existsSync(entry)) {
 console.log('Preparando las cuentas de ESQUORA en Stellar Testnet…')
 await bootstrap()
 void recoverPending().catch(() => console.error('La recuperación inicial de operaciones se volverá a intentar cuando se abran.'))
+function checkRefundDeadlines() {
+  try {
+    notifyExpiredRefunds()
+  } catch (error) {
+    console.error('No se pudieron registrar los avisos de vencimiento. Se volverá a intentar.', error)
+  }
+}
+checkRefundDeadlines()
 setInterval(() => {
+  checkRefundDeadlines()
   void reconcileQueue().catch(() => console.error('La verificación de movimientos pendientes se volverá a intentar.'))
 }, 15_000).unref()
 

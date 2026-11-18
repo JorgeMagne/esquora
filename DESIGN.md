@@ -119,12 +119,15 @@ Contornos rectos, controles cuadrados y líneas delgadas. El avatar circular dis
 - **Campo.** Borde visible, etiqueta persistente y al menos 48 px de altura. Se indica el horario de Bolivia en los plazos y se admiten centavos.
 - **Condiciones.** La barra representa el importe relativo de cada condición. La lista permite abrir cada expediente y muestra su estado y monto. En un tramo entregado o devuelto, la fila muestra el importe neto registrado. Si hubo un reparto, se muestran ambos importes netos.
 - **Corte de torre.** La silueta y el marcador azul se mantienen estables. Con la documentación confirmada, se consolida la base del plano. Al confirmarse el inicio, se consolidan la cuadrícula y las divisiones. Una devolución mantiene el nivel anterior. La posición del marcador es esquemática.
+- **Plano de protección.** La caja fuerte ocupa el centro de una perspectiva con edificios y trazos de replanteo detrás. Se usa como ilustración en la pasarela. El contorno se traza una vez y se muestra completo con movimiento reducido.
+- **Pago.** «Mi compra» lleva a la cotización mediante una sola acción. La pasarela destaca el total en bolivianos y el importe protegido en dólares, con tipo de cambio y vencimiento. La espera conserva la referencia. El comprobante muestra el importe depositado y el enlace a la transacción después de confirmarse en la red.
 - **Comprobantes.** Cada movimiento confirmado tiene fecha y acceso al registro público. La demostración de protección distingue una simulación de un intento registrado en Stellar.
 
 ## Do's and Don'ts
 
 - Conserva una sola acción principal para la tarea actual y una zona clara para leer el estado antes de actuar.
 - Usa etiquetas para distinguir los importes protegido, entregado y devuelto, incluso cuando alguno sea cero.
+- En «Mi compra», el importe protegido ocupa la cabecera. El resumen inferior muestra lo entregado y lo devuelto.
 - Muestra «Confirmando» mientras el pago, la devolución o el registro del acuerdo esperan a la red.
 - Reserva los detalles de Stellar para la vista de verificación. Los usuarios ven la condición, la persona que debe actuar y el comprobante.
 - Mantén visibles el foco por teclado y la alternativa de movimiento reducido.

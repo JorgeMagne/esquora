@@ -29,7 +29,8 @@ export const POLLAR_SERVER_URL = (process.env.POLLAR_SERVER_URL ?? 'https://serv
 
 export const PLATFORM_FEE_BPS = Number(process.env.PLATFORM_FEE_BPS ?? 90)
 export { TW_FEE_BPS } from '../shared/fees.ts'
-export const BOB_PER_USDC = Number(process.env.ANCHOR_BOB_PER_USDC ?? 6.96)
+// Referencia del BCB del 17-11-2026 para el proveedor simulado.
+export const BOB_PER_USDC = Number(process.env.ANCHOR_BOB_PER_USDC ?? 11.70)
 export const ANCHOR_INITIAL_CENTS = Number(process.env.ANCHOR_INITIAL_CENTS ?? 1_200_000)
 export const APP_URL = new URL(process.env.APP_URL ?? 'http://localhost:5173').origin
 export const SECURE_COOKIES = APP_URL.startsWith('https:')

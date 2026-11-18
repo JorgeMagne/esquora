@@ -1,64 +1,11 @@
 import { useState } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowDownLeft, ArrowRight, ArrowUpRight, Check, Landmark, ShieldCheck } from 'lucide-react'
-import { Link, useParams, useSearchParams } from 'react-router'
-import { api, operationPath, read, readOperation, write, type DepositOrder, type Notification, type Receipt, type Verification, type Wallet } from './api.ts'
+import { useQueryClient } from '@tanstack/react-query'
+import { ArrowDownLeft, ArrowRight, ArrowUpRight, ShieldCheck } from 'lucide-react'
+import { Link, useParams } from 'react-router'
+import { conditionPath, operationPath, read, readOperation, useSession, write, type Notification, type Receipt, type Verification, type Wallet } from './api.ts'
 import { amountInCents, eventLabels, formatDate, money } from './model.ts'
-import { useSession } from './session.tsx'
 import { ReconnectLink, useChainAction, useSigningAvailable } from './signing.tsx'
 import { ActionLink, Amount, Back, Empty, ExplorerLink, Feedback, Field, Loading, RowLink, Submit, Title, TotalsStrip, useWork } from './ui.tsx'
-
-export function Bank() {
-  const { id = '' } = useParams()
-  const [params] = useSearchParams()
-  const session = useSession()
-  const task = useWork()
-  const path = '/anchor/orders/' + encodeURIComponent(id)
-  const order = useQuery({
-    queryKey: [path],
-    queryFn: ({ signal }) => api<DepositOrder>(path, { signal }),
-    refetchInterval: ({ state }) => state.data?.status === 'settled' ? false :
-      ['paid', 'pending_confirmation', 'confirming'].includes(state.data?.status ?? '') ? 2400 : 15000,
-  })
-  const query = useQueryClient()
-  const data = order.data
-  const operationId = data?.opId || params.get('operacion')
-  const back = operationId ? operationPath(operationId) : '/'
-  const past = !!data && (data.expired || Date.parse(data.expiresAt) < Date.now())
-  const confirming = !!data && ['paid', 'pending_confirmation', 'confirming'].includes(data.status)
-
-  return <article className="bank">
-    <Back to={back}>Volver a ESQUORA</Back>
-    <div className="bank-heading"><Landmark size={26} aria-hidden="true" />Pasarela bancaria de pruebas</div>
-    {order.isPending && <Loading>Consultando el pago…</Loading>}
-    <Feedback error={order.error} onRetry={order.isError ? () => void order.refetch() : undefined} />
-    {data && <>
-      <header><h1>{data.status === 'settled' ? 'Depósito confirmado' : 'Pagar cuota inicial'}</h1><p>{data.concept}</p></header>
-      <div className="bank-amount"><Amount cents={data.amountBob} currency="Bs" /></div>
-      <dl className="details">
-        <div><dt>Cuota inicial</dt><dd>{money(data.amount)}</dd></div>
-        <div><dt>Cotización de prueba</dt><dd>Bs {new Intl.NumberFormat('es-BO', { maximumFractionDigits: 4 }).format(data.rate)} por USD</dd></div>
-        <div><dt>Referencia</dt><dd>{data.reference}</dd></div>
-        {data.beneficiary && <div><dt>Desarrollador</dt><dd>{data.beneficiary}</dd></div>}
-        {data.status !== 'settled' && <div><dt>Cotización vigente hasta</dt><dd>{formatDate(data.expiresAt, true)} (Bolivia)</dd></div>}
-      </dl>
-      <p className="bank-note">Entorno simulado. El importe se registra en la red de pruebas sin usar dinero de tu banco.</p>
-      <Feedback error={task.error || (data.status === 'failed' ? data.error || 'El depósito no se confirmó. Puedes volver a intentarlo.' : null)} />
-      {data.status === 'settled' ? <div className="stack">
-        <Feedback><Check size={17} aria-hidden="true" /> Tu cuota inicial ya está protegida.</Feedback>
-        <ExplorerLink base={session.data?.config.explorerUrl} hash={data.txHash} />
-        <ActionLink to={back}>Volver a mi compra</ActionLink>
-      </div> : confirming ? <Loading>Confirmando el depósito…</Loading> :
-        past ? <><Feedback error="La cotización venció. Solicita una nueva desde tu operación." /><ActionLink to={back}>Volver a la operación</ActionLink></> :
-          <button className="button primary" type="button" disabled={task.busy} onClick={() => void task.run(async () => {
-            await write(path + '/pay')
-            await order.refetch()
-            await query.invalidateQueries({ queryKey: ['/ops'] })
-            if (operationId) await query.invalidateQueries({ queryKey: ['/ops/' + operationId] })
-          })}>{task.busy ? 'Confirmando…' : 'Simular pago bancario'}<ArrowRight size={18} aria-hidden="true" /></button>}
-    </>}
-  </article>
-}
 
 export function WalletPage() {
   const session = useSession()
@@ -265,9 +212,13 @@ export function Notifications() {
     {notices.isPending && <Loading>Buscando avisos…</Loading>}
     <Feedback error={notices.error ?? task.error} onRetry={notices.isError ? () => void notices.refetch() : undefined} />
     {notices.data && (notices.data.items.length ? <div className="row-list">
-      {notices.data.items.map((item) => <RowLink key={item.id} to={operationPath(item.opId)}
-        title={<>{item.unread && <i className="unread-dot" aria-label="Sin leer" />} {eventLabels[item.type] ?? 'Novedad en tu operación'}</>}
-        detail={item.unit + ' · ' + formatDate(item.at, true)} />)}
+      {notices.data.items.map((item) => {
+        const trancheId = item.data?.trancheId
+        const to = typeof trancheId === 'string' ? conditionPath(item.opId, trancheId) : operationPath(item.opId)
+        return <RowLink key={item.id} to={to}
+          title={<>{item.unread && <i className="unread-dot" aria-label="Sin leer" />} {eventLabels[item.type] ?? 'Novedad en tu operación'}</>}
+          detail={item.unit + ' · ' + formatDate(item.at, true)} />
+      })}
     </div> : <Empty title="No tienes avisos">Aquí verás los cambios y confirmaciones de tus operaciones.</Empty>)}
   </>
 }

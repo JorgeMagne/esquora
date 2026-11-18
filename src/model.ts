@@ -81,6 +81,7 @@ export const eventLabels: Record<string, string> = {
   approved: 'Condición confirmada', released: 'Pago entregado', refund_requested: 'Devolución solicitada',
   refund_accepted: 'Devolución aceptada', refund_rejected: 'Devolución rechazada', refunded: 'Dinero devuelto',
   refund_responded: 'Respuesta a la devolución',
+  refund_response_expired: 'Venció el plazo para responder la devolución',
   disputed: 'Desacuerdo abierto', dispute_opened: 'Desacuerdo abierto', resolved: 'Desacuerdo resuelto',
   closed: 'Operación finalizada', objected: 'Documentos observados', declined: 'Acuerdo rechazado',
   cancelled: 'Invitación retirada', probe_rejected: 'Protección comprobada',

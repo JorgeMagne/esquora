@@ -1,0 +1,182 @@
+.payment-sheet {
+  --bank-ink: #273a50;
+  --bank-active: #152435;
+  width: min(100%, 900px);
+  margin-inline: auto;
+}
+
+.payment-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  border-bottom: 1px solid var(--control-line);
+}
+
+.payment-top .back {
+  flex: none;
+  margin: 0;
+}
+
+.payment-environment {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-inline-start: auto;
+  color: var(--bank-ink);
+  font-weight: 600;
+  font-size: .87rem;
+  line-height: 1.2;
+}
+
+.payment-layout {
+  display: grid;
+  grid-template-areas: "heading plan" "amount plan" "review plan";
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, .8fr);
+  column-gap: clamp(24px, 5vw, 74px);
+  align-items: start;
+  padding-block: 34px 10px;
+}
+
+.payment-header {
+  grid-area: heading;
+}
+
+.payment-header h1:focus {
+  outline: none;
+}
+
+.payment-header p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.payment-amount {
+  grid-area: amount;
+  padding-block: 24px 20px;
+}
+
+.payment-amount > span {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: .93rem;
+  line-height: 1.25;
+}
+
+.payment-amount .amount {
+  color: var(--bank-ink);
+  font-size: 3.35rem;
+}
+
+.payment-plan {
+  grid-area: plan;
+  align-self: center;
+  width: 100%;
+  height: auto;
+  color: var(--bank-ink);
+}
+
+.payment-review {
+  grid-area: review;
+  min-width: 0;
+}
+
+.payment-details {
+  margin: 0;
+  border-top: 1px solid var(--control-line);
+}
+
+.payment-details > div {
+  padding-block: 10px;
+}
+
+.payment-actions {
+  display: grid;
+  align-items: start;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.payment-note {
+  margin: 0;
+  color: var(--muted);
+}
+
+.payment-actions > .button.primary {
+  background: var(--bank-ink);
+  border-color: var(--bank-ink);
+  width: 100%;
+}
+
+.payment-actions > .button.primary:hover:not(:disabled) {
+  background: var(--bank-active);
+}
+
+.payment-actions .external-link {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+
+.payment-sheet > .feedback,
+.payment-sheet > .loading {
+  margin-block: 22px;
+}
+
+.payment-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  clip-path: inset(50%);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+@media (max-width: 680px) {
+  .payment-layout {
+    grid-template-areas: "heading" "amount" "plan" "review";
+    grid-template-columns: minmax(0, 1fr);
+    padding-block-start: 23px;
+  }
+
+  .payment-header h1 {
+    font-size: 2.12rem;
+  }
+
+  .payment-amount {
+    padding-block: 22px 6px;
+  }
+
+  .payment-amount .amount {
+    font-size: 2.6rem;
+  }
+
+  .payment-plan {
+    justify-self: center;
+    width: min(80%, 260px);
+    margin-block: 2px 14px;
+  }
+}
+
+@media (max-width: 360px) {
+  .payment-top {
+    gap: 8px;
+  }
+
+  .payment-top .back {
+    font-size: .86rem;
+  }
+
+  .payment-environment {
+    font-size: .77rem;
+  }
+
+  .payment-details > div {
+    gap: 8px;
+  }
+}

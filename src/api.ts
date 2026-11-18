@@ -42,7 +42,7 @@ export type Operation = Omit<OperationSummary, 'tranches'> & {
 export type DepositOrder = {
   id: string; opId?: string; amount: number; rate: number; amountBob: number; reference: string;
   status: string; expiresAt: string; expired?: boolean; error?: string | null; txHash?: string | null;
-  payer?: string; beneficiary?: string; concept?: string; paymentUrl?: string;
+  beneficiary?: string; concept?: string; paymentUrl?: string;
 }
 export type Invitation = {
   opId: string; code: string; project: Pick<Project, 'name' | 'city'>; unit: string; unitDetail?: string | null; deposit: number; price: number;
@@ -90,6 +90,10 @@ export function read<T>(path: string) {
     queryKey: [path],
     queryFn: ({ signal }) => api<T>(path, { signal }),
   })
+}
+
+export function useSession() {
+  return read<Session>('/me')
 }
 
 export function readOperation(id: string) {

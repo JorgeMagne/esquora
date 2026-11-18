@@ -2,13 +2,13 @@ import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { ArrowRight, Check, Copy } from 'lucide-react'
 import { Link, useNavigate, useParams } from 'react-router'
+import { canOpenConditionDispute } from '../shared/conditions.ts'
 import { netAfterFees, TW_FEE_BPS } from '../shared/fees.ts'
 import {
-  conditionPath, invitationPath, operationPath, paymentPath, read, readOperation, uploadFile, write,
+  conditionPath, invitationPath, operationPath, paymentPath, read, readOperation, uploadFile, useSession, write,
   type ActionInput, type DepositOrder, type Evidence, type Operation, type ProjectDetail, type Tranche,
 } from './api.ts'
 import { amountInCents, conditionAmounts, conditionLabels, formatDate, money, nextConditionAction, numberAmount, operationLabels, requirementGuide, towerStage } from './model.ts'
-import { useSession } from './session.tsx'
 import { ReconnectLink, useAgreementSignature, useChainAction, useSigningAvailable } from './signing.tsx'
 import type { ActionPrompt } from './signing.tsx'
 import { ActionLink, Amount, Back, Dialog, ExplorerLink, Feedback, Field, FileRow, Loading, Submit, Title, TotalsStrip, Tower, useWork } from './ui.tsx'
@@ -42,6 +42,7 @@ export function OperationPage() {
   const query = readOperation(id)
   if (query.isPending) return <Loading>Abriendo la operación…</Loading>
   if (query.isError) return <Feedback error={query.error} onRetry={() => void query.refetch()} />
+  if (query.data.role === 'buyer' && query.data.status === 'awaiting_deposit') return <DepositReview operation={query.data} />
   if (!['funded', 'closed'].includes(query.data.status)) return <Agreement operation={query.data} />
   return <Purchase operation={query.data} />
 }
@@ -52,6 +53,32 @@ export function AgreementPage() {
   if (operation.isPending) return <Loading>Abriendo el acuerdo…</Loading>
   if (operation.isError) return <Feedback error={operation.error} onRetry={() => void operation.refetch()} />
   return <Agreement operation={operation.data} fromOperation />
+}
+
+function DepositReview({ operation }: { operation: Operation }) {
+  const { id, project, unit, deposit, depositOrder } = operation
+  const task = useWork()
+  const navigate = useNavigate()
+  const pending = depositOrder?.status === 'paid'
+  const paymentUrl = (orderId: string) => paymentPath(orderId) + '?operacion=' + encodeURIComponent(id)
+
+  return <div className="deposit-review">
+    <Back to="/">Mis compras</Back>
+    <Title detail={project.name + ' · ' + unit}>{pending ? 'Confirmando el depósito' : 'Deposita la cuota inicial'}</Title>
+    <section className="deposit-quote" aria-label="Cuota inicial">
+      <Amount cents={deposit} />
+      <p>{pending
+        ? 'El saldo aparecerá como protegido cuando se confirme en la red.'
+        : 'Revisa cuánto pagarías en bolivianos. El depósito confirmado queda protegido por las condiciones del acuerdo.'}</p>
+      <Feedback error={task.error} />
+      {pending ? <ActionLink to={paymentUrl(depositOrder.id)}>Consultar depósito</ActionLink> :
+        <button className="button primary" type="button" disabled={task.busy} onClick={() => void task.run(async () => {
+          const order = await write<DepositOrder>('/ops/' + id + '/deposit')
+          navigate(paymentUrl(order.id))
+        })}>{task.busy ? 'Preparando cotización…' : 'Ver cotización'}<ArrowRight size={18} aria-hidden="true" /></button>}
+      <Link className="text-link" to={operationPath(id) + '/acuerdo'}>Ver acuerdo</Link>
+    </section>
+  </div>
 }
 
 function Purchase({ operation }: { operation: Operation }) {
@@ -93,8 +120,8 @@ function Purchase({ operation }: { operation: Operation }) {
       </Link></li>})}
     </ul>
     <div className="purchase-below">
-      <TotalsStrip totals={totals} />
-      {approved && <Feedback>Listo. El desarrollador ya puede recibir el pago.</Feedback>}
+      <TotalsStrip totals={totals} showProtected={false} />
+      {approved && !next && <Feedback>El desarrollador ya puede recibir el pago.</Feedback>}
       {confirming && <Loading>Confirmando…</Loading>}
       {!confirming && !approved && !next && operation.todo && <p className="muted">{operation.todo}</p>}
       <div className="record-links">
@@ -110,7 +137,6 @@ function Purchase({ operation }: { operation: Operation }) {
 function Agreement({ operation, fromOperation = false }: { operation: Operation; fromOperation?: boolean }) {
   const { id, role, status, deposit, project, seller, buyerName, arbiter, contract, tranches } = operation
   const query = useQueryClient()
-  const navigate = useNavigate()
   const signAgreement = useAgreementSignature()
   const canSign = useSigningAvailable()
   const user = useSession().data?.user
@@ -138,18 +164,17 @@ function Agreement({ operation, fromOperation = false }: { operation: Operation;
 
   return <>
     <Back to={fromOperation ? operationPath(id) : '/'}>{fromOperation ? 'Volver a la operación' : 'Operaciones'}</Back>
-    <Title detail={project.name + ' · ' + operation.unit}>{status === 'awaiting_deposit' ? 'Cuota inicial' : 'Acuerdo de preventa'}</Title>
+    <Title detail={project.name + ' · ' + operation.unit}>Acuerdo de preventa</Title>
     <div className="two-column">
       <div>
         <section className="section">
-          <h2>Acuerdo</h2>
+          <h2>Partes y contrato</h2>
           <dl className="details">
             <div><dt>Estado</dt><dd>{operationLabels[status] ?? 'Por revisar'}</dd></div>
             {operation.unitDetail && <div><dt>Unidad</dt><dd>{operation.unitDetail}</dd></div>}
             <div><dt>Desarrollador</dt><dd>{seller.orgName ?? seller.name}</dd></div>
             <div><dt>Comprador</dt><dd>{buyerName}</dd></div>
             <div><dt>Precio del inmueble</dt><dd>{money(operation.price)}</dd></div>
-            <div><dt>Cuota inicial</dt><dd>{money(deposit)}</dd></div>
             <div><dt>Tercero designado</dt><dd>{arbiter.orgName ?? arbiter.name}</dd></div>
             <div><dt>Plazo para responder una devolución</dt><dd>{operation.refundResponseHours < 1 ?
               Math.round(operation.refundResponseHours * 60) + ' min' : operation.refundResponseHours + ' h'}</dd></div>
@@ -166,7 +191,7 @@ function Agreement({ operation, fromOperation = false }: { operation: Operation;
         </section>
       </div>
       <section className="section">
-        <h2>Cuota inicial protegida</h2>
+        <h2>Cuota inicial</h2>
         <Amount cents={deposit} />
         <dl className="details">
           <div><dt>Comisión de ESQUORA</dt><dd>{percent.format(operation.feeBps / 10_000)}</dd></div>
@@ -185,11 +210,7 @@ function Agreement({ operation, fromOperation = false }: { operation: Operation;
             {task.busy ? 'Confirmando…' : canSend ? 'Enviar invitación' : 'Aceptar acuerdo'}<ArrowRight size={18} aria-hidden="true" />
           </button> : <ReconnectLink />)}
         {canAccept && <button className="text-button" type="button" disabled={task.busy} onClick={() => setDialog('decline')}>Rechazar acuerdo</button>}
-        {role === 'buyer' && status === 'awaiting_deposit' && operation.depositOrder?.status !== 'paid' && <button className="button primary" type="button" disabled={task.busy}
-          onClick={() => void task.run(async () => {
-            const order = await write<DepositOrder>(route + '/deposit')
-            navigate(paymentPath(order.id) + '?operacion=' + encodeURIComponent(id))
-          })}>{task.busy ? 'Preparando pago…' : 'Ver cotización y pagar'}<ArrowRight size={18} aria-hidden="true" /></button>}
+        {role === 'buyer' && status === 'awaiting_deposit' && <ActionLink to={operationPath(id)}>Ir a la cuota inicial</ActionLink>}
         {role === 'seller' && status === 'invited' && inviteUrl && <div className="stack invite-share">
           <Field label="Enlace de invitación"><input value={inviteUrl} readOnly onFocus={(event) => event.currentTarget.select()} /></Field>
           <button type="button" className="button secondary" onClick={() => void task.run(async () => { await navigator.clipboard.writeText(inviteUrl); setCopied(true) })}>
@@ -240,16 +261,24 @@ function ConditionDetail({ operation, tranche }: { operation: Operation; tranche
   const [form, setForm] = useState<'object' | 'dispute' | null>(null)
   const [refundDecision, setRefundDecision] = useState<'accepted' | 'rejected'>('accepted')
   const [response, setResponse] = useState('')
-  const [toBuyer, setToBuyer] = useState(String(tranche.amount / 100))
-  const [proposedBuyer, setProposedBuyer] = useState(tranche.amount)
+  const [toBuyer, setToBuyer] = useState('')
   const [submitted, setSubmitted] = useState('')
   const state = conditionState(tranche)
   const gross = tranche.amount
+  const agreedRefund = tranche.refundResponse === 'accepted'
+  let buyerShare: number | null = agreedRefund ? gross : null
+  if (!agreedRefund && toBuyer.trim()) {
+    try {
+      const amount = amountInCents(toBuyer, true)
+      if (amount <= gross) buyerShare = amount
+    } catch { /* El importe puede estar incompleto mientras se edita. */ }
+  }
   const locked = chain.busy || tranche.pendingAction?.status === 'pending'
   const action = operation.status === 'funded' && !locked ? nextConditionAction(role, tranche) : null
   const net = netAfterFees(gross, feeBps)
   const isResolved = ['released', 'refunded', 'resolved'].includes(tranche.status)
-  const canDispute = operation.status === 'funded' && role !== 'arbiter' && !locked && ['submitted', 'objected', 'approved'].includes(tranche.status)
+  const settlement = conditionAmounts(tranche)
+  const canDispute = operation.status === 'funded' && role !== 'arbiter' && !locked && canOpenConditionDispute(tranche.status)
   const responseDeadline = tranche.refundResponseDueAt ?? (tranche.refundRequestedAt ?
     new Date(Date.parse(tranche.refundRequestedAt) + operation.refundResponseHours * 3600000).toISOString() : null)
 
@@ -302,21 +331,22 @@ function ConditionDetail({ operation, tranche }: { operation: Operation; tranche
           open({ kind: 'evidence', items, note }, 'Presentar documentos', 'El comprador recibirá estos documentos para revisar la condición.', 'Documentos presentados. El comprador ya puede revisarlos.')} />}
       </div>
       <section className="section action-section">
-        <h2>{state}</h2>
-        <Amount cents={gross} />
+        <h2>{settlement.state === 'shared' ? 'Reparto confirmado' : state}</h2>
+        {settlement.state !== 'shared' && <Amount cents={settlement.amount} />}
         <dl className="details">
-          <div><dt>Fecha límite</dt><dd>{formatDate(tranche.dueAt, true)}</dd></div>
-          {isResolved && <><div><dt>Entregado al desarrollador</dt><dd>{money(tranche.toSeller ?? 0)}</dd></div>
-            <div><dt>Devuelto</dt><dd>{money(tranche.toBuyer ?? 0)}</dd></div>
+          {!isResolved && <div><dt>Fecha límite</dt><dd>{formatDate(tranche.dueAt, true)}</dd></div>}
+          {isResolved && <>
+            {settlement.state === 'shared' && <><div><dt>Entregado al desarrollador</dt><dd>{money(settlement.seller)}</dd></div>
+              <div><dt>Devuelto al comprador</dt><dd>{money(settlement.buyer)}</dd></div></>}
+            <div><dt>Importe del tramo</dt><dd>{money(gross)}</dd></div>
             {!!tranche.fee && <div><dt>Comisiones</dt><dd>{money(tranche.fee)}</dd></div>}</>}
         </dl>
         <ExplorerLink base={session.data?.config.explorerUrl} hash={tranche.txHash} />
         {tranche.pendingAction?.status === 'pending' && <Loading>Confirmando…</Loading>}
-        {role === 'buyer' && tranche.status === 'approved' && <Feedback>Listo. El desarrollador ya puede recibir el pago.</Feedback>}
         {(action || form === 'dispute') && action !== 'refund-response' && !signer && <ReconnectLink />}
         {action === 'approve' && signer && <>
           <button className="button primary" type="button" onClick={() => open({ kind: 'approve' }, 'Confirmar la condición',
-            'Confirmas que los documentos cumplen lo acordado. Después, el desarrollador podrá recibir el pago.', 'Listo. El desarrollador ya puede recibir el pago.')}>
+            'Esta confirmación es definitiva. El desarrollador podrá recibir el pago de esta condición.', 'Listo. El desarrollador ya puede recibir el pago.')}>
             Confirmar condición<ArrowRight size={18} aria-hidden="true" />
           </button>
           <button className="text-button" type="button" onClick={() => setForm('object')}>Objetar documentos</button>
@@ -326,7 +356,7 @@ function ConditionDetail({ operation, tranche }: { operation: Operation; tranche
             'Se entregarán ' + money(net) + ' después de descontar las comisiones de esta condición.', 'Pago entregado.')}>
           Recibir pago aprobado<ArrowRight size={18} aria-hidden="true" /></button>}
         {action === 'refund' && signer && <>
-          <p>Siguen protegidos {money(gross)}. Si la devolución se ejecuta por el monto completo, recibirás {money(net)} después de comisiones.</p>
+          <p>Si se devuelve el tramo completo, recibirás <strong>{money(net)}</strong> después de comisiones.</p>
           <button className="button primary" type="button" onClick={() => open({ kind: 'refund' }, 'Pedir devolución',
             'El importe seguirá protegido mientras el desarrollador responde y el tercero designado resuelve.', 'Devolución solicitada.')} >
             Pedir devolución<ArrowRight size={18} aria-hidden="true" /></button>
@@ -346,28 +376,26 @@ function ConditionDetail({ operation, tranche }: { operation: Operation; tranche
           <Submit waiting={task.busy}>Registrar respuesta</Submit>
         </form>}
         {action === 'resolve' && signer && <form className="stack" onSubmit={task.submit(async () => {
-          const buyer = tranche.refundResponse === 'accepted' ? gross : amountInCents(toBuyer, true)
-          if (buyer > gross) throw new Error('La devolución supera el importe protegido de esta condición.')
-          const seller = gross - buyer
-          open({ kind: 'resolve', toBuyer: buyer, toSeller: seller, note: response }, 'Ejecutar la resolución',
-            'Importe antes de comisiones. Comprador ' + money(buyer) + '. Desarrollador ' + money(seller) + '.', 'Resolución confirmada.')
+          if (buyerShare === null) throw new Error('Ingresa un importe válido para el comprador.')
+          const sellerShare = gross - buyerShare
+          open({ kind: 'resolve', toBuyer: buyerShare, toSeller: sellerShare, note: response }, 'Ejecutar la resolución',
+            'Importe antes de comisiones. Comprador ' + money(buyerShare) + '. Desarrollador ' + money(sellerShare) + '.', 'Resolución confirmada.')
         })}>
-          <Field label="Monto para el comprador (USD)">
-            <input inputMode="decimal" required value={toBuyer} readOnly={tranche.refundResponse === 'accepted'} onChange={(event) => {
-              setToBuyer(event.target.value)
-              try { setProposedBuyer(Math.min(amountInCents(event.target.value, true), gross)) } catch { /* Espera un importe completo. */ }
-            }} />
+          <Field label="Monto para el comprador (USD)"
+            help={!agreedRefund && !!toBuyer.trim() && buyerShare === null ? 'Ingresa un importe entre USD 0 y ' + money(gross) + '.' : undefined}>
+            <input inputMode="decimal" required value={agreedRefund ? String(gross / 100) : toBuyer} readOnly={agreedRefund}
+              onChange={(event) => setToBuyer(event.target.value)} />
           </Field>
-          <p className="muted">Monto para el desarrollador antes de comisiones · {money(gross - proposedBuyer)}</p>
+          {buyerShare !== null && <p className="muted">Monto para el desarrollador antes de comisiones · {money(gross - buyerShare)}</p>}
           <Field label="Motivo o instrucciones de la resolución"><textarea value={response} onChange={(event) => setResponse(event.target.value)} maxLength={1000} required /></Field>
-          <Submit waiting={task.busy}>Revisar y ejecutar resolución</Submit>
+          <Submit waiting={task.busy} disabled={buyerShare === null}>Revisar y ejecutar resolución</Submit>
         </form>}
         {canDispute && <button className="text-button" type="button" disabled={task.busy} onClick={() => setForm('dispute')}>Abrir desacuerdo</button>}
         <Feedback error={task.error}>{submitted}</Feedback>
         {chain.feedback}
       </section>
     </div>
-    {form && <Dialog title={form === 'object' ? 'Objetar documentos' : 'Abrir desacuerdo'} onClose={() => setForm(null)}>
+    {(form === 'object' || (form === 'dispute' && canDispute)) && <Dialog title={form === 'object' ? 'Objetar documentos' : 'Abrir desacuerdo'} onClose={() => setForm(null)}>
       <form className="stack" onSubmit={task.submit(async (formData) => {
         const reason = String(formData.get('reason')).trim()
         if (!reason) throw new Error('Escribe un motivo para continuar.')
