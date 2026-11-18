@@ -5,7 +5,7 @@ import { Link, useNavigate, useParams } from 'react-router'
 import { canOpenConditionDispute } from '../shared/conditions.ts'
 import { netAfterFees, TW_FEE_BPS } from '../shared/fees.ts'
 import {
-  conditionPath, depositInProgress, invitationPath, operationPath, paymentPath, read, readOperation, resolverInvitationPath, uploadFile, useSession, write,
+  conditionPath, depositInProgress, invitationPath, operationPath, paymentPath, read, readAccessLost, readOperation, resolverInvitationPath, uploadFile, useSession, write,
   type ActionInput, type DepositOrder, type Evidence, type Operation, type ProjectDetail, type ResolutionMode, type Tranche,
 } from './api.ts'
 import { amountInCents, conditionAmounts, conditionLabels, formatDate, money, nextConditionAction, numberAmount, operationLabels, requirementGuide, towerStage } from './model.ts'
@@ -44,7 +44,7 @@ export function OperationPage() {
   const { id = '' } = useParams()
   const query = readOperation(id)
   if (query.isPending) return <Loading>Abriendo la operación…</Loading>
-  if (query.isError) return <Feedback error={query.error} onRetry={() => void query.refetch()} />
+  if (!query.data || readAccessLost(query.error)) return <Feedback error={query.error} onRetry={() => void query.refetch()} />
   if (query.data.role === 'buyer' && query.data.status === 'awaiting_deposit') return <DepositReview operation={query.data} />
   if (!['funded', 'closed'].includes(query.data.status)) return <Agreement operation={query.data} />
   return <Purchase operation={query.data} />
@@ -54,7 +54,7 @@ export function AgreementPage() {
   const { id = '' } = useParams()
   const operation = readOperation(id)
   if (operation.isPending) return <Loading>Abriendo el acuerdo…</Loading>
-  if (operation.isError) return <Feedback error={operation.error} onRetry={() => void operation.refetch()} />
+  if (!operation.data || readAccessLost(operation.error)) return <Feedback error={operation.error} onRetry={() => void operation.refetch()} />
   return <Agreement operation={operation.data} fromOperation />
 }
 
@@ -331,7 +331,7 @@ export function ConditionPage() {
   const { id = '', trancheId = '' } = useParams()
   const query = readOperation(id)
   if (query.isPending) return <Loading>Abriendo la condición…</Loading>
-  if (query.isError) return <Feedback error={query.error} onRetry={() => void query.refetch()} />
+  if (!query.data || readAccessLost(query.error)) return <Feedback error={query.error} onRetry={() => void query.refetch()} />
   const tranche = query.data.tranches.find((item) => item.id === trancheId)
   if (!tranche) return <><Back to={operationPath(id)}>Volver a la operación</Back><Feedback error="Esta condición no está disponible." /></>
   return <ConditionDetail key={tranche.id} operation={query.data} tranche={tranche} />

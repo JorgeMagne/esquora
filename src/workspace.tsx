@@ -4,7 +4,7 @@ import { ArrowDown, ArrowRight, ArrowUp, ChevronRight, Plus, Trash2 } from 'luci
 import { Link, useNavigate, useParams } from 'react-router'
 import { netAfterFees } from '../shared/fees.ts'
 import {
-  invitationPath, operationPath, projectPath, read, resolverInvitationPath, uploadFile, useSession, write, type Invitation, type Operation,
+  invitationPath, operationPath, projectPath, read, readAccessLost, resolverInvitationPath, uploadFile, useSession, write, type Invitation, type Operation,
   type OperationSummary, type Project, type ProjectDetail, type ResolutionMode, type ResolverInvitation, type User,
 } from './api.ts'
 import { amountInCents, conditions, formatDate, money, operationLabels } from './model.ts'
@@ -21,10 +21,11 @@ export function Home({ user }: { user: User }) {
 
 function BuyerHome() {
   const list = read<OperationSummary[]>('/ops')
+  const purchases = readAccessLost(list.error) ? undefined : list.data
   const current: OperationSummary[] = []
   const history: OperationSummary[] = []
   let protectedTotal = 0
-  for (const operation of list.data ?? []) {
+  for (const operation of purchases ?? []) {
     if (['closed', 'declined', 'cancelled'].includes(operation.status)) history.push(operation)
     else current.push(operation)
     protectedTotal += operation.totals.held
@@ -33,8 +34,8 @@ function BuyerHome() {
   return <div className="buyer-home">
     <Title>Mis compras</Title>
     {list.isPending && <Loading>Buscando tus compras…</Loading>}
-    {list.isError && <Feedback error={list.error} onRetry={() => void list.refetch()} />}
-    {list.isSuccess && <div className="buyer-home-layout">
+    {list.isError && !purchases && <Feedback error={list.error} onRetry={() => void list.refetch()} />}
+    {purchases && <div className="buyer-home-layout">
       <div>
         {protectedTotal > 0 && <div className="buyer-protected">
           <p>Total protegido en tus compras</p>
@@ -42,7 +43,7 @@ function BuyerHome() {
         </div>}
         {current.length > 0 && <BuyerPurchases title="En curso" operations={current} />}
         {history.length > 0 && <BuyerPurchases title="Historial" operations={history} />}
-        {list.data.length === 0 && <Empty title="Todavía no tienes compras">
+        {purchases.length === 0 && <Empty title="Todavía no tienes compras">
           Cuando tu desarrollador te comparta un enlace de invitación, ábrelo con el correo indicado en el acuerdo.
         </Empty>}
       </div>
@@ -80,7 +81,7 @@ function BuyerPurchases({ title, operations }: { title: string; operations: Oper
 function CasesHome() {
   const list = read<OperationSummary[]>('/ops')
   if (list.isPending) return <Loading>Buscando tus casos…</Loading>
-  if (list.isError) return <Feedback error={list.error} onRetry={() => void list.refetch()} />
+  if (!list.data || readAccessLost(list.error)) return <Feedback error={list.error} onRetry={() => void list.refetch()} />
   return <>
     <Title>Casos</Title>
     {list.data.length ? <div className="workspace-plan">

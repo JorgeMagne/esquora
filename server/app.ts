@@ -19,7 +19,7 @@ import { ADDRESSES, ChainError, USDC, accountInfo, buildWithdrawXdr, ensureUserA
 import { buildMilestoneAction, buildProbe, readEscrow } from './tw.ts'
 import { PollarError, type Identity, verifyAgreementSignature, verifyPollarToken } from './pollar.ts'
 import {
-  actionById, assertNoPending, deployOperation, invalidateArmed, prepareAction, processQueuedDeposit, refreshAction,
+  actionById, assertNoPending, deployOperation, invalidateArmed, prepareAction, processQueuedDeposit, refreshAction, refreshOperationSnapshot,
   runExclusive, submitAction, syncOperation, type ActionData,
 } from './chain.ts'
 import {
@@ -576,9 +576,12 @@ app.post('/api/ops', auth, async (c) => {
 app.get('/api/ops/:id', auth, async (c) => {
   const u = c.get('user')
   const id = c.req.param('id') ?? ''
-  loadOp(u, id)
+  const { op } = loadOp(u, id)
   const order = currentDepositOrder(id)
-  if (order?.status !== 'queued' && order?.status !== 'paid') await syncOperation(id)
+  if (order?.status !== 'queued' && order?.status !== 'paid') {
+    if (c.req.query('snapshot') === '1') refreshOperationSnapshot(op)
+    else await syncOperation(id)
+  }
   return c.json(serializeOp(loadOp(u, id).op, u))
 })
 
@@ -1105,20 +1108,18 @@ app.post('/api/notifications/seen', auth, (c) => {
 })
 
 app.get('/api/stream', auth, (c) =>
-  streamSSE(c, async (stream) => {
+  streamSSE(c, (stream) => new Promise<void>((resolve) => {
     const u = c.get('user')
-    let open = true
     const off = subscribe(u.id, (msg) => {
-      stream.writeSSE({ data: JSON.stringify(msg) }).catch(() => {})
+      void stream.writeSSE({ data: JSON.stringify(msg) })
     })
+    const heartbeat = setInterval(() => void stream.writeSSE({ event: 'ping', data: '' }), 20_000)
+    heartbeat.unref()
     stream.onAbort(() => {
-      open = false
+      clearInterval(heartbeat)
       off()
+      resolve()
     })
-    await stream.writeSSE({ data: JSON.stringify({ type: 'hello' }) })
-    while (open) {
-      await stream.sleep(20_000)
-      if (open) await stream.writeSSE({ event: 'ping', data: '' })
-    }
-  }),
+    void stream.writeSSE({ retry: 2500, data: JSON.stringify({ type: 'hello' }) })
+  })),
 )

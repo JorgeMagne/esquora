@@ -38,25 +38,49 @@ const queryClient = new QueryClient({
   },
 })
 
+function watchesOperations(path: string) {
+  return path === '/ops' || path === '/notifications' || path.startsWith('/projects') ||
+    path.startsWith('/invitations/') || path.startsWith('/resolver-invitations/') ||
+    (path.startsWith('/tranches/') && path.endsWith('/resolution-instruction'))
+}
+
 function LiveUpdates({ userId }: { userId: string }) {
   const query = useQueryClient()
   useEffect(() => {
+    const refreshVisible = () => {
+      if (document.visibilityState !== 'visible' || !navigator.onLine) return
+      void query.refetchQueries({
+        type: 'active',
+        predicate: ({ queryKey }) => {
+          const path = String(queryKey[0])
+          return watchesOperations(path) || /^\/ops\/[^/]+$/.test(path)
+        },
+      }, { cancelRefetch: false })
+    }
     const stream = new EventSource('/api/stream')
+    stream.onopen = refreshVisible
     stream.onmessage = (message) => {
       try {
         const update = JSON.parse(message.data) as { type: string; id?: string }
-        if (update.type === 'op') {
+        if (update.type === 'op' && typeof update.id === 'string') {
+          const operation = '/ops/' + encodeURIComponent(update.id)
           void query.invalidateQueries({ predicate: ({ queryKey }) => {
             const path = String(queryKey[0])
-            return path === '/ops' || path.startsWith('/projects') || path === '/notifications' ||
-              (path.startsWith('/tranches/') && path.endsWith('/resolution-instruction')) ||
-              path === '/ops/' + update.id || path === '/ops/' + update.id + '/verification'
+            return watchesOperations(path) || path === operation || path === operation + '/verification'
           } })
         }
         if (update.type === 'wallet') void query.invalidateQueries({ queryKey: ['/wallet'] })
       } catch { /* Ignorar un aviso inválido y mantener la conexión. */ }
     }
-    return () => stream.close()
+    const poll = window.setInterval(refreshVisible, 5000)
+    window.addEventListener('online', refreshVisible)
+    document.addEventListener('visibilitychange', refreshVisible)
+    return () => {
+      stream.close()
+      window.clearInterval(poll)
+      window.removeEventListener('online', refreshVisible)
+      document.removeEventListener('visibilitychange', refreshVisible)
+    }
   }, [userId, query])
   return null
 }

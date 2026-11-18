@@ -75,6 +75,10 @@ export class ApiError extends Error {
   }
 }
 
+export function readAccessLost(error: unknown) {
+  return error instanceof ApiError && [401, 403, 404].includes(error.status)
+}
+
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response
   try {
@@ -109,9 +113,10 @@ export function useSession() {
 }
 
 export function readOperation(id: string) {
+  const path = '/ops/' + encodeURIComponent(id)
   return useQuery({
-    queryKey: ['/ops/' + id],
-    queryFn: ({ signal }) => api<Operation>('/ops/' + id, { signal }),
+    queryKey: [path],
+    queryFn: ({ signal }) => api<Operation>(path + '?snapshot=1', { signal }),
     refetchInterval: (query) => {
       const operation = query.state.data
       if (!operation) return false

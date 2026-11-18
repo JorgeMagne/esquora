@@ -19,7 +19,7 @@ process.env.APP_URL = 'http://127.0.0.1:8787'
 const { app } = await import('../server/app.ts')
 const { prepareAction, syncOperation } = await import('../server/chain.ts')
 const { db } = await import('../server/db.ts')
-const { notifyExpiredRefunds, subscribe } = await import('../server/domain.ts')
+const { logEvent, notifyExpiredRefunds, opById, subscribe } = await import('../server/domain.ts')
 
 after(async () => {
   db.close()
@@ -349,6 +349,55 @@ test('protege el cobro confirmado, las órdenes de pago y los avisos de vencimie
       assert.equal((await buyerNotices.json()).unread, 0)
     } finally {
       unsubscribe()
+    }
+  })
+
+  await t.test('el comprador recibe la presentación, y el tercero recibe el caso cuando se abre', async (context) => {
+    const contractId = StrKey.encodeContract(Buffer.alloc(32, 2))
+    db.prepare(`INSERT INTO operations
+      (id,code,project_id,seller_id,buyer_id,buyer_email,buyer_name,arbiter_id,unit,price,deposit,fee_bps,
+       refund_response_hours,terms_json,terms_digest,invite_token,status,escrow_contract_id,created_at)
+      VALUES ('live-op','LIVE','review-project',?,?,?,'Comprador',?,'B-20',30000,15000,90,72,'{}',?,
+        'live-invite','funded',?,?)`)
+      .run(sellerId, buyerId, buyer.profile.email, arbiterId, 'a'.repeat(64), contractId, timestamp)
+    db.prepare(`INSERT INTO tranches (id,op_id,idx,title,condition,requirements_json,amount,due_at,status)
+      VALUES ('live-tranche','live-op',0,'Inicio de obra','Presentar el acta','[]',15000,?,'pending')`).run(past)
+
+    let resumeNetwork!: () => void
+    const network = new Promise<void>((resolve) => { resumeNetwork = resolve })
+    context.mock.method(rpc.Server.prototype, 'getAccount', async () => {
+      await network
+      throw new Error('Stellar no responde en esta prueba')
+    })
+    const buyerStream = (await request('/api/stream', 'GET', undefined, headers(buyer))).body!.getReader()
+    const arbiterStream = (await request('/api/stream', 'GET', undefined, headers(arbiter))).body!.getReader()
+    const withDeadline = <T>(response: T | Promise<T>) => new Promise<T>((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error('No llegó la actualización a tiempo')), 1500)
+      void Promise.resolve(response).then(resolve, reject).finally(() => clearTimeout(timeout))
+    })
+    const message = async (stream: typeof buyerStream) => new TextDecoder().decode((await withDeadline(stream.read())).value)
+    try {
+      assert.match(await message(buyerStream), /"type":"hello"/)
+      assert.match(await message(arbiterStream), /"type":"hello"/)
+      db.prepare("UPDATE tranches SET status = 'submitted' WHERE id = 'live-tranche'").run()
+      logEvent(opById('live-op')!, sellerId, 'evidence_submitted')
+      assert.match(await message(buyerStream), /"id":"live-op"/)
+      const url = '/api/ops/live-op?snapshot=1'
+      const detail = await withDeadline(request(url, 'GET', undefined, headers(buyer)))
+      assert.equal((await detail.json()).tranches[0].status, 'submitted')
+      assert.equal((await request(url, 'GET', undefined, headers(arbiter))).status, 404)
+      const before = await request('/api/ops', 'GET', undefined, headers(arbiter))
+      assert.ok(!(await before.json()).some((row: { id: string }) => row.id === 'live-op'))
+
+      db.prepare("UPDATE tranches SET status = 'disputed' WHERE id = 'live-tranche'").run()
+      logEvent(opById('live-op')!, buyerId, 'dispute_opened')
+      assert.match(await message(arbiterStream), /"id":"live-op"/)
+      const after = await request('/api/ops', 'GET', undefined, headers(arbiter))
+      assert.ok((await after.json()).some((row: { id: string }) => row.id === 'live-op'))
+    } finally {
+      await Promise.all([buyerStream.cancel(), arbiterStream.cancel()])
+      resumeNetwork()
+      await syncOperation('live-op')
     }
   })
 })

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { ArrowRight } from 'lucide-react'
-import { read, uploadFile, write, type FileInfo, type Operation, type Tranche } from './api.ts'
+import { read, readAccessLost, uploadFile, write, type FileInfo, type Operation, type Tranche } from './api.ts'
 import { amountInCents, money } from './model.ts'
 import { ReconnectLink, useAgreementSignature, useSigningAvailable, type ActionPrompt } from './signing.tsx'
 import { Feedback, Field, FileRow, Loading, Submit, useWork } from './ui.tsx'
@@ -54,7 +54,7 @@ export function ResolutionInstruction({ operation, tranche, locked, onReady }: {
   }
 
   if (current.isPending) return <Loading>Consultando la instrucción…</Loading>
-  if (current.isError) return <Feedback error={current.error} onRetry={() => void current.refetch()} />
+  if (!current.data || readAccessLost(current.error)) return <Feedback error={current.error} onRetry={() => void current.refetch()} />
   if (!instruction && !editable) return null
 
   return <div className="resolution-instruction stack">

@@ -397,6 +397,12 @@ export async function syncOperation(id: string) {
   return runExclusive('op:' + id, () => reconcileOperation(id))
 }
 
+export function refreshOperationSnapshot(op: OpRow) {
+  if ((!op.escrow_contract_id && op.status !== 'deploying') || queues.has('op:' + op.id)) return
+  if (op.observed_at && Date.now() - Date.parse(op.observed_at) < 30_000) return
+  void syncOperation(op.id).catch(() => undefined)
+}
+
 export async function recoverPending() {
   const ops = all<{ id: string }>("SELECT id FROM operations WHERE escrow_contract_id IS NOT NULL OR status = 'deploying'")
   for (const op of ops) await syncOperation(op.id).catch(() => undefined)
