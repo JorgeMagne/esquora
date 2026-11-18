@@ -8,9 +8,10 @@ import {
   type OperationSummary, type Project, type ProjectDetail, type ResolutionMode, type ResolverInvitation, type User,
 } from './api.ts'
 import { amountInCents, conditions, formatDate, money, operationLabels } from './model.ts'
+import { AccessPlan } from './plans.tsx'
 import { amountsForDraft, buildDraftConditions, draftAmount, draftRequirement, emptyCondition, MAX_CONDITIONS, MAX_REQUIREMENTS, moveCondition, preventaTemplate, type DraftCondition } from './preventa-draft.ts'
 import { ResolverOptions } from './resolver-options.tsx'
-import { ActionLink, Amount, Back, Empty, Feedback, Field, FileRow, Loading, RowLink, Submit, Title, TotalsStrip, Tower, useWork } from './ui.tsx'
+import { ActionLink, Amount, Back, Empty, Feedback, Field, FileRow, Loading, RowLink, Submit, Title, TotalsStrip, useWork } from './ui.tsx'
 
 export function Home({ user }: { user: User }) {
   if (user.kind === 'developer') return <DeveloperHome />
@@ -29,7 +30,7 @@ function OperationList({ user }: { user: User }) {
       <div className="empty-with-plan">
         <Empty title={arbiter ? 'No tienes casos pendientes' : 'Todavía no tienes una compra'}>
           {arbiter ? 'Cuando te corresponda intervenir, encontrarás aquí el expediente.' : 'Abre el enlace que te envíe tu desarrollador para revisar el acuerdo de preventa.'}
-        </Empty><Tower />
+        </Empty><AccessPlan />
       </div>}
   </>
 }
@@ -357,7 +358,7 @@ export function InvitationPage() {
                 navigate(operationPath(result.opId))
               })}>{task.busy ? 'Abriendo…' : 'Ver acuerdo'}<ArrowRight size={18} aria-hidden="true" /></button>}
     </section>
-    <figure className="invitation-plan"><Tower unit={unit} /></figure>
+    <div className="invitation-plan"><AccessPlan /></div>
   </div>
 }
 
@@ -376,13 +377,16 @@ export function ResolverInvitationPage() {
   }} />
   const user = session.data.user
   const returnTo = encodeURIComponent(resolverInvitationPath(token))
-  if (!invitation.data.mine) return <section className="section">
-    <Title>Invitación para un tercero</Title>
-    <p>Entra con el correo al que se envió la invitación para ver los datos de la operación.</p>
-    <ActionLink to={(user ? '/cuenta' : '/entrar') + '?volver=' + returnTo}>
-      {user ? 'Ir a mi cuenta para cerrar sesión' : 'Entrar para ver la invitación'}
-    </ActionLink>
-  </section>
+  if (!invitation.data.mine) return <div className="invitation">
+    <section className="invitation-copy">
+      <h1>Invitación para un tercero</h1>
+      <p>Entra con el correo al que se envió la invitación para ver los datos de la operación.</p>
+      <ActionLink to={(user ? '/cuenta' : '/entrar') + '?volver=' + returnTo}>
+        {user ? 'Ir a mi cuenta para cerrar sesión' : 'Entrar para ver la invitación'}
+      </ActionLink>
+    </section>
+    <div className="invitation-plan"><AccessPlan /></div>
+  </div>
   const { unit, project, sellerName, status } = invitation.data
   const accepted = status === 'accepted'
 
@@ -404,6 +408,6 @@ export function ResolverInvitationPage() {
                     void query.invalidateQueries({ queryKey: ['/ops'] })
                   })}>{task.busy ? 'Confirmando…' : 'Aceptar designación'}<ArrowRight size={18} aria-hidden="true" /></button>}
     </section>
-    <figure className="invitation-plan"><Tower unit={unit} /></figure>
+    <div className="invitation-plan"><AccessPlan /></div>
   </div>
 }

@@ -3,11 +3,12 @@ import type { ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { PollarClient } from '@pollar/core'
 import { PollarProvider, usePollar } from '@pollar/react'
-import { ArrowRight, LogOut, Mail, ShieldCheck } from 'lucide-react'
+import { ArrowRight, LogOut, Mail } from 'lucide-react'
 import { Link, Navigate, useLocation, useSearchParams } from 'react-router'
 import { useSession, write, type Session, type User } from './api.ts'
 import { initials, roleNames, wait } from './model.ts'
-import { ActionLink, Feedback, Field, Loading, Submit, Title, Tower, useWork } from './ui.tsx'
+import { AccessPlan } from './plans.tsx'
+import { ActionLink, Feedback, Field, Loading, Submit, Title, useWork } from './ui.tsx'
 import '@pollar/react/styles.css'
 
 const sessionKey = ['/me']
@@ -94,7 +95,6 @@ export function Login() {
     <section className="access-copy">
       <h1>Entra a tu cuenta</h1>
       <p>Consulta tu operación, revisa sus condiciones y encuentra tus comprobantes.</p>
-      <div className="access-note"><ShieldCheck size={20} aria-hidden="true" />Entorno de pruebas</div>
     </section>
     <section className="access-form" aria-label="Métodos de acceso">
       {!pollarKey ? <Feedback error="El acceso todavía no está disponible en este entorno." /> : <>
@@ -148,7 +148,7 @@ export function Login() {
           </>}
       </>}
     </section>
-    <div className="access-drawing"><Tower /></div>
+    <div className="access-drawing"><AccessPlan /></div>
   </div>
 }
 
