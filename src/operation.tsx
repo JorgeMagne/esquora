@@ -9,11 +9,12 @@ import {
   type ActionInput, type DepositOrder, type Evidence, type Operation, type ProjectDetail, type ResolutionMode, type Tranche,
 } from './api.ts'
 import { amountInCents, conditionAmounts, conditionLabels, formatDate, money, nextConditionAction, numberAmount, operationLabels, requirementGuide, towerStage } from './model.ts'
+import { Tower } from './plans.tsx'
 import { ReconnectLink, useAgreementSignature, useChainAction, useSigningAvailable } from './signing.tsx'
 import type { ActionPrompt } from './signing.tsx'
 import { ResolverOptions } from './resolver-options.tsx'
 import { ResolutionInstruction } from './resolution.tsx'
-import { ActionLink, Amount, Back, Dialog, ExplorerLink, Feedback, Field, FileRow, Loading, Submit, Title, TotalsStrip, Tower, useWork } from './ui.tsx'
+import { ActionLink, Amount, Back, Dialog, ExplorerLink, Feedback, Field, FileRow, Loading, Submit, Title, TotalsStrip, useWork } from './ui.tsx'
 
 const percent = new Intl.NumberFormat('es-BO', { style: 'percent', maximumFractionDigits: 2 })
 

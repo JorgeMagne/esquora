@@ -88,9 +88,9 @@ a.avatar:hover::before { background: var(--blue-wash); border-color: var(--blue)
 .two-column > * { min-width: 0; }
 .workspace-columns { margin-top: 30px; }
 .workspace-plan { display: grid; grid-template-columns: minmax(0, 1fr) minmax(210px, .42fr); align-items: center; gap: 28px; }
-.workspace-plan .access-plan { justify-self: end; width: min(100%, 260px); }
+.workspace-plan .access-plan-frame { justify-self: end; width: min(100%, 260px); }
 .empty-with-plan { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, .7fr); align-items: center; gap: 24px; max-width: 920px; }
-.empty-with-plan .access-plan { justify-self: end; }
+.empty-with-plan .access-plan-frame { justify-self: end; }
 .empty { padding: 16px 0 30px; }
 .empty h2 { font-size: 1.32rem; }
 .empty p { color: var(--muted); margin: 9px 0 0; }
@@ -200,7 +200,7 @@ a.avatar:hover::before { background: var(--blue-wash); border-color: var(--blue)
 .invitation-copy .button { margin-top: 16px; }
 .invite-amount { padding: 15px 0; border-top: 1px solid var(--line); }
 .invite-amount p { margin: 0 0 4px; }
-.invitation-plan .access-plan { margin-inline: auto; }
+.invitation-plan .access-plan-frame { margin-inline: auto; }
 .invite-share { margin-top: 18px; }
 
 .purchase { max-width: 970px; margin-inline: auto; }
@@ -221,12 +221,14 @@ a.avatar:hover::before { background: var(--blue-wash); border-color: var(--blue)
 .tower-registration { opacity: 0; }
 .tower-documented .tower-registration { opacity: .55; }
 .tower-started .tower-floors { stroke-dasharray: none; opacity: .6; }
-.access-plan { display: block; width: min(100%, 420px); height: auto; color: var(--ink); }
+.access-plan-frame { width: min(100%, 420px); }
+.access-plan { display: block; width: 100%; height: auto; color: var(--ink); }
 .access-plan-guides { opacity: .3; }
 .access-plan-background { stroke: color-mix(in srgb, currentColor 42%, var(--paper)); }
 .access-plan-buildings { stroke: color-mix(in srgb, currentColor 63%, var(--paper)); }
 .access-plan-grid { opacity: .52; }
-.blueprint-stroke { opacity: 0; }
+.blueprint-frame { position: relative; }
+.blueprint-toggle, .blueprint-ink { display: none; }
 .plan-guides { opacity: .3; }
 .plan-neighbors { opacity: .46; }
 .plan-face { fill: var(--plan-paper, var(--paper)); }
@@ -236,18 +238,30 @@ a.avatar:hover::before { background: var(--blue-wash); border-color: var(--blue)
 .plan-protected .plan-vault-door { stroke: var(--blue); fill: var(--blue-wash); }
 @media (prefers-reduced-motion: no-preference) {
   .plan-trace { stroke-dasharray: 100 100; animation: trace-plan 620ms cubic-bezier(.25, 1, .4, 1) both; }
-  .access-plan[data-draw="true"] .blueprint-stroke, .tower .blueprint-stroke {
+  .blueprint-ink {
+    display: inline;
     stroke: var(--blue);
-    stroke-width: 2.2;
+    stroke-width: 1.9;
+    stroke-dasharray: 3 2.6;
     stroke-linecap: round;
-    stroke-linejoin: round;
-    stroke-dasharray: 100 100;
-    animation: draw-blueprint 2.65s var(--draw-delay, 70ms) cubic-bezier(.24, .64, .34, 1) both;
+    opacity: .88;
   }
-  .blueprint-stroke-front { --draw-delay: 320ms; }
-  .blueprint-stroke-middle { --draw-delay: 480ms; }
-  .blueprint-stroke-tower { --draw-delay: 660ms; }
-  .blueprint-stroke-floors { --draw-delay: 850ms; }
+  .blueprint-ink-back { stroke-width: 1.35; opacity: .59; }
+  .blueprint-ink-front { stroke-width: 2.05; opacity: 1; }
+  .blueprint-band {
+    transform-box: view-box;
+    animation: draft-elevation 8s -1.65s linear infinite paused;
+  }
+  .blueprint-band-secondary { animation-delay: -5.65s; opacity: .8; }
+  .blueprint-frame[data-moving="true"] .blueprint-band { animation-play-state: running; }
+  .blueprint-toggle {
+    position: absolute;
+    inset: 0;
+    display: block;
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
   .field > span, .field :is(input, textarea, select) { transition: color 150ms ease, border-color 150ms ease; }
   .button .lucide-arrow-right { transition: transform 180ms cubic-bezier(.2, .75, .25, 1); }
   .access-form > .stack, .access-form > .feedback { animation: reveal-access-step 200ms cubic-bezier(.2, .75, .25, 1) both; }
@@ -256,11 +270,7 @@ a.avatar:hover::before { background: var(--blue-wash); border-color: var(--blue)
   .button:not(:disabled):hover .lucide-arrow-right { transform: translateX(3px); }
 }
 @keyframes trace-plan { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
-@keyframes draw-blueprint {
-  0% { opacity: .9; stroke-dashoffset: 100; }
-  60%, 76% { opacity: .9; stroke-dashoffset: 0; }
-  100% { opacity: 0; stroke-dashoffset: 0; }
-}
+@keyframes draft-elevation { from { transform: translateY(100%); } to { transform: translateY(-46%); } }
 @keyframes reveal-access-step { from { opacity: .68; transform: translateY(3px); } }
 .condition-meter { display: flex; gap: 3px; height: 12px; margin: 0 0 5px; }
 .condition-meter > i { flex-basis: 0; min-width: 4px; width: auto; height: 100%; }
@@ -321,11 +331,11 @@ a.avatar:hover::before { background: var(--blue-wash); border-color: var(--blue)
   .invitation { grid-template-columns: minmax(0, 1fr); gap: 19px; margin-top: 5px; }
   .invitation-copy h1 { font-size: 2.7rem; }
   .invitation-copy h1 span { font-size: 1.17rem; }
-  .invitation-plan, .empty-with-plan .access-plan { justify-self: center; width: min(100%, 360px); }
+  .invitation-plan, .empty-with-plan .access-plan-frame { justify-self: center; width: min(100%, 360px); }
   .invitation-copy .button { width: 100%; }
   .empty-with-plan { grid-template-columns: minmax(0, 1fr); gap: 0; }
   .workspace-plan { grid-template-columns: minmax(0, 1fr); gap: 12px; }
-  .workspace-plan .access-plan { justify-self: center; width: min(100%, 225px); }
+  .workspace-plan .access-plan-frame { justify-self: center; width: min(100%, 225px); }
   .page:has(.purchase) { padding-top: 12px; }
   .purchase-hero { grid-template-columns: minmax(0, 1fr) 116px; min-height: 230px; gap: 12px; }
   .purchase-subject h1 { font-size: 2.6rem; }
