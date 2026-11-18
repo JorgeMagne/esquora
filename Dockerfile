@@ -23,7 +23,6 @@ COPY --from=build /app/shared ./shared
 COPY --from=build /app/dist ./dist
 COPY --chmod=755 scripts/docker-entrypoint.sh /usr/local/bin/esquora-entrypoint
 RUN command -v setpriv && install -d -o node -g node -m 0700 /app/data
-VOLUME ["/app/data"]
 EXPOSE 8787
 ENTRYPOINT ["/usr/local/bin/esquora-entrypoint"]
 CMD ["node", "--import", "tsx", "server/index.ts"]
