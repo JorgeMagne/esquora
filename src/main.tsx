@@ -1,8 +1,8 @@
-import { lazy, StrictMode, Suspense, useEffect } from 'react'
+import { Component, lazy, StrictMode, Suspense, useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowRight, Bell, Building2, FolderOpen, ReceiptText, UserRound, WalletCards } from 'lucide-react'
-import { BrowserRouter, Link, Navigate, NavLink, Outlet, Route, Routes, useLocation, useMatch, useSearchParams } from 'react-router'
+import { BrowserRouter, Link, matchPath, Navigate, NavLink, Outlet, Route, Routes, useLocation, useMatch, useSearchParams } from 'react-router'
 import type { ReactNode } from 'react'
 import { api, operationPath, read, useSession, type Notification, type OperationSummary, type User } from './api.ts'
 import { initials, operationLabels, roleNames } from './model.ts'
@@ -26,6 +26,19 @@ const Notifications = lazy(() => import('./records.tsx').then((module) => ({ def
 const Receipts = lazy(() => import('./records.tsx').then((module) => ({ default: module.Receipts })))
 const VerificationPage = lazy(() => import('./records.tsx').then((module) => ({ default: module.VerificationPage })))
 const WalletPage = lazy(() => import('./records.tsx').then((module) => ({ default: module.WalletPage })))
+
+window.addEventListener('vite:preloadError', () => {
+  if (!matchPath('/pago/:id', window.location.pathname) || !navigator.onLine) return
+  const key = 'esquora:payment-reload'
+  const attempted = import.meta.url + window.location.pathname
+  try {
+    if (sessionStorage.getItem(key) === attempted) return
+    sessionStorage.setItem(key, attempted)
+  } catch {
+    return
+  }
+  window.location.reload()
+})
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -172,17 +185,45 @@ function Protected({ user, kind, children }: { user?: User | null; kind?: User['
   return <>{children}</>
 }
 
+class BankErrorBoundary extends Component<{ back: string; children: ReactNode }> {
+  state = { failed: false }
+
+  static getDerivedStateFromError() {
+    return { failed: true }
+  }
+
+  render() {
+    if (!this.state.failed) return this.props.children
+    return <div className="deposit-review">
+      <Title>Cotización no disponible</Title>
+      <div className="deposit-quote">
+        <p role="alert">No pudimos abrir la cotización. Vuelve a cargar la pantalla para consultar la misma orden.</p>
+        <button className="button primary" type="button" onClick={() => window.location.reload()}>
+          Volver a cargar la cotización
+        </button>
+        <a className="text-link" href={this.props.back}>{this.props.back === '/' ? 'Volver al inicio' : 'Volver a la operación'}</a>
+      </div>
+    </div>
+  }
+}
+
 function App() {
   const session = useSession()
   const user = session.data?.user
+  const { pathname } = useLocation()
   const [params] = useSearchParams()
+  const paymentOperation = params.get('operacion')
   if (session.isPending) return <Shell><Loading>Abriendo ESQUORA…</Loading></Shell>
   if (session.isError) return <Shell><Feedback error={session.error} onRetry={() => void session.refetch()} /></Shell>
 
   return <Routes>
-    <Route path="/pago/:id" element={<main className="bank-shell"><Suspense fallback={<Loading />}>
-      <Protected user={user} kind="buyer"><Bank /></Protected>
-    </Suspense></main>} />
+    <Route path="/pago/:id" element={<main className="bank-shell">
+      <BankErrorBoundary key={pathname} back={paymentOperation ? operationPath(paymentOperation) : '/'}>
+        <Suspense fallback={<Loading>Abriendo la cotización…</Loading>}>
+          <Protected user={user} kind="buyer"><Bank /></Protected>
+        </Suspense>
+      </BankErrorBoundary>
+    </main>} />
     <Route path="*" element={<Shell user={user}>
       <Routes>
         <Route path="/invitacion/:token" element={<InvitationPage />} />
