@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { ArrowRight, Check, Copy } from 'lucide-react'
 import { Link, useNavigate, useParams } from 'react-router'
@@ -360,7 +360,9 @@ function ConditionDetail({ operation, tranche }: { operation: Operation; tranche
     } catch { /* El importe puede estar incompleto mientras se edita. */ }
   }
   const locked = chain.busy || tranche.pendingAction?.status === 'pending'
-  const action = operation.status === 'funded' && !locked ? nextConditionAction(role, tranche) : null
+  const nextAction = operation.status === 'funded' ? nextConditionAction(role, tranche) : null
+  const action = locked ? null : nextAction
+  const presentingEvidence = signer && nextAction === 'evidence'
   const net = netAfterFees(gross, feeBps)
   const isResolved = ['released', 'refunded', 'resolved'].includes(tranche.status)
   const esquoraResolution = operation.resolutionMode === 'esquora' &&
@@ -417,7 +419,7 @@ function ConditionDetail({ operation, tranche }: { operation: Operation; tranche
           {tranche.refundResponseReason && <p>{tranche.refundResponseReason}</p>}
           <Link className="text-link" to={operationPath(id) + '/acuerdo'}>Consultar el acuerdo</Link>
         </section>}
-        {action === 'evidence' && signer && <EvidenceForm operation={operation} tranche={tranche} onReady={(items, note) =>
+        {presentingEvidence && <EvidenceForm operation={operation} tranche={tranche} locked={locked} feedback={chain.feedback} onReady={(items, note) =>
           open({ kind: 'evidence', items, note }, 'Presentar documentos', 'El comprador recibirá estos documentos para revisar la condición.', 'Documentos presentados. El comprador ya puede revisarlos.')} />}
       </div>
       <section className="section action-section">
@@ -484,7 +486,7 @@ function ConditionDetail({ operation, tranche }: { operation: Operation; tranche
         </form>}
         {canDispute && <button className="text-button" type="button" disabled={task.busy} onClick={() => setForm('dispute')}>Abrir desacuerdo</button>}
         <Feedback error={task.error}>{submitted}</Feedback>
-        {chain.feedback}
+        {!presentingEvidence && chain.feedback}
       </section>
     </div>
     {(form === 'object' || (form === 'dispute' && canDispute)) && <Dialog title={form === 'object' ? 'Objetar documentos' : 'Abrir desacuerdo'} onClose={() => setForm(null)}>
@@ -510,8 +512,8 @@ function ConditionDetail({ operation, tranche }: { operation: Operation; tranche
   </>
 }
 
-function EvidenceForm({ operation, tranche, onReady }: {
-  operation: Operation; tranche: Tranche;
+function EvidenceForm({ operation, tranche, locked, feedback, onReady }: {
+  operation: Operation; tranche: Tranche; locked: boolean; feedback: ReactNode;
   onReady: (items: { reqKey: string; fileId: string }[], note: string) => void;
 }) {
   const project = read<ProjectDetail>('/projects/' + operation.project.id)
@@ -523,6 +525,7 @@ function EvidenceForm({ operation, tranche, onReady }: {
   return <section className="section">
     <h2>Presentar documentos</h2>
     <form className="stack" onSubmit={task.submit(async (data) => {
+      if (locked) return
       const items: { reqKey: string; fileId: string }[] = []
       const chosen = tranche.requirements.map((requirement) => {
         const input = data.get(requirement.key)
@@ -540,11 +543,13 @@ function EvidenceForm({ operation, tranche, onReady }: {
     })}>
       {tranche.requirements.map((requirement) => <Field key={requirement.key} label={requirement.label}
         help={linked(requirement.key)?.file ? 'Disponible para reutilizar · ' + linked(requirement.key)?.file?.name : undefined}>
-        <input name={requirement.key} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" required={!linked(requirement.key)?.file} />
+        <input name={requirement.key} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp"
+          required={!linked(requirement.key)?.file} disabled={locked || task.busy} />
       </Field>)}
-      <Field label="Comentario para el comprador (opcional)"><textarea name="note" maxLength={1000} /></Field>
+      <Field label="Comentario para el comprador (opcional)"><textarea name="note" maxLength={1000} disabled={locked || task.busy} /></Field>
       <Feedback error={task.error} />
-      <Submit waiting={task.busy}>Revisar presentación</Submit>
+      {feedback}
+      <Submit waiting={task.busy} disabled={locked}>Revisar presentación</Submit>
     </form>
   </section>
 }

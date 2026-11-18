@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { after, test } from 'node:test'
 import { promisify } from 'node:util'
-import { Keypair } from '@stellar/stellar-sdk'
+import { Account, Keypair, Networks, Operation, TransactionBuilder } from '@stellar/stellar-sdk'
 
 const dataDir = await mkdtemp(join(tmpdir(), 'esquora-api-test-'))
 const testToken = 'esquora-local-fixture-token-never-use-online'
@@ -17,6 +17,7 @@ process.env.HORIZON_URL = 'https://127.0.0.1:1'
 process.env.APP_URL = 'http://127.0.0.1:8787'
 
 const { app } = await import('../server/app.ts')
+const { prepareAction } = await import('../server/chain.ts')
 const { db } = await import('../server/db.ts')
 const { notifyExpiredRefunds, subscribe } = await import('../server/domain.ts')
 
@@ -96,6 +97,17 @@ test('requires a session to create and inspect chain actions', async () => {
     const response = await request(path, method, body)
     assert.equal(response.status, 401, `${method} ${path}`)
   }
+})
+
+test('una solicitud que ya venció se puede renovar sin pedir una firma sobre ella', () => {
+  const source = Keypair.random().publicKey()
+  const xdr = new TransactionBuilder(new Account(source, '1'), {
+    fee: '100', networkPassphrase: Networks.TESTNET, timebounds: { minTime: 0, maxTime: 1 },
+  }).addOperation(Operation.manageData({ name: 'evidencia', value: 'prueba' })).build().toXDR()
+  assert.throws(() => prepareAction({ kind: 'evidence', xdr, source }), {
+    status: 409, extra: { rearm: true },
+  })
+  assert.equal(db.prepare('SELECT 1 FROM chain_txs WHERE source = ?').get(source), undefined)
 })
 
 test('requires a valid action type before asking Stellar or Trustless Work for a transaction', async () => {

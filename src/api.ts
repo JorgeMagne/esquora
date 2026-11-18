@@ -68,7 +68,7 @@ export type Verification = {
 }
 
 export class ApiError extends Error {
-  constructor(message: string, readonly status: number) {
+  constructor(message: string, readonly status: number, readonly rearm = false) {
     super(message)
     this.name = 'ApiError'
   }
@@ -84,7 +84,10 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   }
   const data = await response.json().catch(() => null)
   if (!response.ok || !data) {
-    throw new ApiError(typeof data?.error === 'string' ? data.error : 'No pudimos completar la solicitud. Vuelve a intentar.', response.status)
+    throw new ApiError(
+      typeof data?.error === 'string' ? data.error : 'No pudimos completar la solicitud. Vuelve a intentar.',
+      response.status, response.status === 409 && data?.rearm === true,
+    )
   }
   return data as T
 }

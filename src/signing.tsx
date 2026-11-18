@@ -33,14 +33,10 @@ export type ActionPrompt = {
   title: string
   detail: string
   complete: string
+  expired?: boolean
 }
 
 const readReceipt = (id: string) => api<Receipt>('/acciones/' + encodeURIComponent(id))
-
-function expiration(expiresAt: Armed['expiresAt']) {
-  if (typeof expiresAt === 'number') return expiresAt < 1e12 ? expiresAt * 1000 : expiresAt
-  return expiresAt ? new Date(expiresAt).getTime() : 0
-}
 
 export function useChainAction(onReceipt?: (receipt: Receipt) => void) {
   const authorize = useAuthorize()
@@ -70,10 +66,6 @@ export function useChainAction(onReceipt?: (receipt: Receipt) => void) {
       if (signed.status !== 'signed') {
         throw new Error('La acción no se confirmó. Vuelve a iniciar la confirmación cuando estés listo.')
       }
-      const deadline = expiration(armed.expiresAt)
-      if (deadline && deadline <= Date.now()) {
-        throw new Error('Venció el tiempo para confirmar. Inicia la acción de nuevo para renovar la solicitud.')
-      }
       setPhase('Confirmando…')
       try {
         receipt = await write<Receipt>('/acciones/' + encodeURIComponent(id) + '/enviar', { signedXdr: signed.signedXdr })
@@ -98,6 +90,9 @@ export function useChainAction(onReceipt?: (receipt: Receipt) => void) {
         throw new Error(receipt.error || 'La acción no quedó confirmada. Revisa el estado de la operación antes de volver a intentar.')
       }
       if (receipt.status === 'confirmed') setMessage(action.complete)
+    } catch (error) {
+      if (!(error instanceof ApiError) || !error.rearm) throw error
+      setPrompt({ ...action, expired: true })
     } finally {
       setPhase('')
       void query.invalidateQueries({ predicate: ({ queryKey }) => queryKey[0] !== '/me' })
@@ -119,6 +114,10 @@ export function useChainAction(onReceipt?: (receipt: Receipt) => void) {
 
   const dialog = prompt && <Dialog title={prompt.title} onClose={() => setPrompt(null)}>
     <p>{prompt.detail}</p>
+    {prompt.expired && <Feedback>
+      Venció la ventana de firma. Confirma de nuevo para preparar una solicitud nueva.
+      {prompt.input.kind === 'evidence' && ' Conservamos los documentos y el comentario de esta presentación.'}
+    </Feedback>}
     <p className="muted">La ventana de confirmación puede estar en inglés.</p>
     <div className="button-row">
       <button className="button secondary" type="button" onClick={() => setPrompt(null)}>Volver</button>
@@ -126,7 +125,7 @@ export function useChainAction(onReceipt?: (receipt: Receipt) => void) {
         const action = prompt
         setPrompt(null)
         void task.run(() => send(action))
-      }}>Continuar<ArrowRight size={18} aria-hidden="true" /></button>
+      }}>{prompt.expired ? 'Volver a confirmar' : 'Continuar'}<ArrowRight size={18} aria-hidden="true" /></button>
     </div>
   </Dialog>
 

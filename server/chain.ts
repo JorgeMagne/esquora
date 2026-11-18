@@ -54,6 +54,9 @@ export function prepareAction(input: {
 }) {
   const envelope = inspectEnvelope(input.xdr)
   if (envelope.source !== input.source) throw new HttpError(502, 'La red preparó una acción para otra cuenta.')
+  if (envelope.expiresAt !== null && envelope.expiresAt <= Date.now()) {
+    throw new HttpError(409, 'La confirmación venció. Vuelve a iniciar la acción.', { rearm: true })
+  }
   const existing = get<ChainTxRow>('SELECT * FROM chain_txs WHERE hash = ?', envelope.hash)
   if (existing && existing.kind === input.kind && existing.status === 'armed' &&
       existing.op_id === (input.opId ?? null) && existing.tranche_id === (input.trancheId ?? null) &&
