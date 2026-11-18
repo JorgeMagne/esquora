@@ -18,13 +18,16 @@ export function Brand() {
 export function Tower({ unit, stage = 'planned' }: { unit?: string; stage?: TowerStage }) {
   const description = unit ? 'Corte ilustrativo del edificio, con un marcador de la unidad ' + unit +
     '. El marcador tiene una posición esquemática.' : 'Corte esquemático de un edificio en preventa'
+  const outline = 'M30 230V26h22V14h24v12h22v204'
   return <svg className={'tower tower-' + stage} viewBox="0 0 116 230" fill="none" role="img" aria-label={description}>
     <g className="tower-floors" stroke="currentColor" strokeWidth=".65" strokeDasharray="2 2.5" opacity=".46">
       <path d="M30 213h68M30 196h68M30 179h68M30 162h68M30 145h68M30 128h68M30 111h68M30 94h68M30 77h68M30 60h68M30 43h68" />
       <path d="M47 26v204M64 26v204M81 26v204" />
     </g>
     <path className="tower-registration" d="M30 213h68M30 196h68M30 179h68" stroke="currentColor" strokeWidth=".65" />
-    <path className="tower-outline" pathLength="100" d="M30 230V26h22V14h24v12h22v204" stroke="currentColor" strokeWidth="1.25" />
+    <path d={outline} stroke="currentColor" strokeWidth="1.25" />
+    <path className="blueprint-stroke" pathLength="100" d={outline} />
+    <path className="blueprint-stroke blueprint-stroke-floors" pathLength="100" d="M30 77h68M30 128h68M30 179h68" />
     <g className="tower-unit">
       <rect x="47" y="162" width="17" height="17" fill="var(--blue)" />
       <path d="M20 170.5h8" stroke="var(--blue)" strokeWidth="1.25" />

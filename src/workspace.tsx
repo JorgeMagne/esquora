@@ -26,7 +26,10 @@ function OperationList({ user }: { user: User }) {
   if (list.data.length === 1 && !arbiter) return <Navigate to={operationPath(list.data[0].id)} replace />
   return <>
     <Title>{arbiter ? 'Casos' : 'Mis compras'}</Title>
-    {list.data.length ? <div className="row-list">{list.data.map((operation) => <OperationRow key={operation.id} operation={operation} />)}</div> :
+    {list.data.length ? <div className="workspace-plan">
+      <div className="row-list">{list.data.map((operation) => <OperationRow key={operation.id} operation={operation} />)}</div>
+      <AccessPlan />
+    </div> :
       <div className="empty-with-plan">
         <Empty title={arbiter ? 'No tienes casos pendientes' : 'Todavía no tienes una compra'}>
           {arbiter ? 'Cuando te corresponda intervenir, encontrarás aquí el expediente.' : 'Abre el enlace que te envíe tu desarrollador para revisar el acuerdo de preventa.'}
@@ -53,8 +56,13 @@ function DeveloperHome() {
     {projects.isPending && <Loading>Cargando proyectos…</Loading>}
     <Feedback error={projects.error} onRetry={projects.isError ? () => void projects.refetch() : undefined} />
     {projects.data && totals && <>
-      <TotalsStrip totals={totals} />
-      {receivable !== undefined && <p className="receivable"><strong>{money(receivable)}</strong> en condiciones confirmadas por cobrar</p>}
+      <div className="workspace-plan">
+        <div>
+          <TotalsStrip totals={totals} />
+          {receivable !== undefined && <p className="receivable"><strong>{money(receivable)}</strong> en condiciones confirmadas por cobrar</p>}
+        </div>
+        <AccessPlan />
+      </div>
       <div className="two-column workspace-columns">
         <section className="section">
           <h2>Mis proyectos</h2>
