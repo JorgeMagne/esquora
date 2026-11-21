@@ -1,0 +1,167 @@
+.process {
+  --process-bottom-padding: clamp(60px, 7vw, 102px);
+  padding-block: clamp(56px, 6vw, 86px) var(--process-bottom-padding);
+  background: var(--mist);
+}
+.process:focus { outline: none; }
+.reservation-journey {
+  --journey-board-height: 420px;
+  --journey-step-distance: clamp(96px, 16svh, 150px);
+  --journey-anchor-padding: 100px;
+  --journey-sticky-top: max(96px, calc((100svh - var(--journey-board-height)) / 2));
+  position: relative;
+}
+.reservation-journey[data-journey-ready] {
+  min-height: calc(var(--journey-board-height) + var(--journey-step-distance) * var(--journey-last-index) + 28px);
+  /* Keep the next section below the viewport until the last step releases the board. */
+  margin-block-end: max(0px, calc(100dvh - var(--journey-sticky-top) - var(--journey-board-height) - var(--process-bottom-padding)));
+}
+.journey-board {
+  display: grid;
+  grid-template-columns: minmax(0, 1.68fr) minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(18px, 3.4vw, 45px) clamp(26px, 5vw, 78px);
+}
+.journey-board h2 {
+  grid-column: 1 / -1;
+  font-size: clamp(2.55rem, 5.2vw, 5rem);
+  text-wrap: unset;
+}
+.reservation-journey[data-journey-ready] .journey-board { position: sticky; top: var(--journey-sticky-top); }
+.journey-marker {
+  position: absolute;
+  inset-inline-start: 0;
+  inset-block-start: calc(var(--journey-step-distance) * var(--journey-index) + 8px);
+  scroll-margin-block-start: calc(var(--journey-sticky-top) - var(--journey-anchor-padding));
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+}
+.journey-stage {
+  min-width: 0;
+  align-self: start;
+  color: var(--paper);
+  background: radial-gradient(ellipse at 49% 54%, #263e5d 0%, #1d2e46 56%, #182639 100%);
+  border-radius: clamp(14px, 1.6vw, 22px);
+  overflow: clip;
+}
+.journey-stage-brand { padding: clamp(13px, 1.8vw, 23px) clamp(15px, 2.3vw, 27px) 0; }
+.journey-stage-brand img { width: clamp(82px, 9vw, 110px); }
+.journey-art { width: 100%; max-height: min(46svh, 440px); aspect-ratio: 720 / 408; }
+.journey-drawing { opacity: 0; }
+.journey-drawing[data-layer] { opacity: var(--journey-art-light, 1); }
+.journey-deposit-token { opacity: 0; }
+
+.journey-nav {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 5px;
+  padding: 0 clamp(8px, 1.7vw, 24px) clamp(8px, 1.4vw, 17px);
+}
+.journey-nav a {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: .4em;
+  min-height: 50px;
+  padding: 5px 4px;
+  border-radius: 8px;
+  color: #c1cee0;
+  font-size: clamp(.77rem, 1.2vw, 1rem);
+  font-weight: 680;
+  white-space: nowrap;
+}
+.journey-nav a:hover, .journey-nav a[aria-current='step'] { color: #fff; background: #8eaff61d; }
+.journey-nav a:focus-visible { outline-color: #bfd7ff; outline-offset: -4px; }
+.journey-nav a span { color: #a7c8ff; font-size: .82em; font-variant-numeric: tabular-nums; }
+
+.journey-steps { min-width: 0; margin: 0; padding: 0; list-style: none; }
+.journey-step { padding-block: 18px; }
+.journey-step:focus { outline: none; }
+.journey-step:focus-visible h3 { text-decoration: underline; text-decoration-color: var(--blue); text-decoration-thickness: .07em; text-underline-offset: .16em; }
+.journey-step h3 {
+  max-width: 15ch;
+  font-size: clamp(2.14rem, 3.8vw, 3.7rem);
+  font-weight: 760;
+  line-height: 1.02;
+  letter-spacing: -.036em;
+  text-wrap: pretty;
+}
+.journey-step p {
+  max-width: 36ch;
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: clamp(1.04rem, 1.45vw, 1.22rem);
+  line-height: 1.43;
+  text-wrap: pretty;
+}
+.reservation-journey[data-journey-ready] .journey-steps { display: grid; }
+.reservation-journey[data-journey-ready] .journey-step { grid-area: 1 / 1; padding-block: 0; border: 0; }
+.reservation-journey[data-journey-ready] .journey-step:not([data-current]) { visibility: hidden; }
+.journey-partner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px 13px;
+  margin-top: 19px;
+  color: var(--muted);
+  font-size: .9rem;
+  line-height: 1.2;
+}
+.journey-partner > img { flex: 0 0 auto; width: auto; height: 19px; }
+.journey-partner-lockup { display: inline-flex; align-items: center; gap: 5px; color: var(--ink); font-weight: 790; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .journey-access-mail { opacity: calc(.35 + .65 * var(--mail, 1)); transform: translateX(calc(-14px * (1 - var(--mail, 1)))); }
+  .journey-access-code { opacity: var(--code, 1); }
+  .journey-access-confirm { opacity: var(--access, 1); }
+  .journey-unit { opacity: calc(.42 + var(--selection, 1) * .58); transform: translateX(calc((1 - var(--selection, 1)) * -7px)); }
+  .journey-trace { stroke-dasharray: 1; stroke-dashoffset: calc(1 - var(--trace, 1)); }
+  .journey-signature { stroke-dasharray: 1; stroke-dashoffset: calc(1 - var(--signature, 1)); }
+  .journey-confirmation { opacity: var(--confirmation, 1); }
+  .journey-deposit-token {
+    transform-origin: 152px 222px;
+    transform: translateX(calc(240px * var(--transfer, 1))) scale(calc(1 - .76 * var(--transfer, 1)));
+    opacity: clamp(0, calc((1 - var(--transfer, 1)) * 5), 1);
+  }
+  .journey-deposit-sent { opacity: var(--lock, 1); }
+  .journey-vault-door { transform-origin: 323px 220px; transform: scaleX(calc(.15 + .85 * var(--close, 1))); }
+  .journey-vault-handle { transform-origin: 396px 220px; transform: rotate(calc((1 - var(--lock, 1)) * -64deg)); }
+  .journey-evidence-line { stroke-dasharray: 1; stroke-dashoffset: calc(1 - var(--review, 1)); }
+  .journey-ledger-routes path { stroke-dasharray: 1; stroke-dashoffset: calc(1 - var(--ledger, 1)); }
+  .journey-approval { stroke-dasharray: 1; stroke-dashoffset: calc(1 - var(--approval, 1)); }
+  .journey-approval-seal { opacity: var(--seal, 1); }
+  .journey-nav a { transition: background-color 160ms ease, color 160ms ease; }
+}
+
+@media (max-width: 900px) {
+  .journey-board { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); column-gap: 25px; }
+  .journey-nav a span { display: none; }
+}
+
+@media (max-width: 735px) {
+  .reservation-journey { --journey-sticky-top: 76px; --journey-anchor-padding: 77px; }
+  .journey-board { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  .journey-board h2 { font-size: clamp(2.18rem, 9vw, 3.6rem); }
+  .journey-art { max-height: min(36svh, 272px); }
+  .journey-nav a { min-height: 44px; padding-inline: 2px; font-size: clamp(.69rem, 2.9vw, .9rem); }
+  .journey-step h3 { max-width: 18ch; font-size: clamp(1.95rem, 8vw, 2.6rem); }
+  .journey-step p { margin-top: 9px; }
+  .journey-partner { margin-top: 13px; }
+}
+
+@media (max-width: 735px) and (max-height: 660px) {
+  .journey-board { gap: 13px; }
+  .journey-art { max-height: min(30svh, 172px); }
+  .journey-step h3 { font-size: clamp(1.63rem, 7.2vw, 2.08rem); }
+  .journey-step p { font-size: 1rem; line-height: 1.36; }
+}
+
+@media (min-width: 736px) and (max-height: 530px) {
+  .journey-board { row-gap: 13px; }
+  .journey-board h2 { font-size: 2.6rem; }
+  .journey-art { max-height: 34svh; }
+  .journey-step h3 { font-size: clamp(1.65rem, 3.5vw, 2.25rem); }
+  .journey-step p { margin-top: 8px; font-size: 1rem; line-height: 1.36; }
+  .journey-partner { margin-top: 12px; }
+}

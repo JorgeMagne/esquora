@@ -1,0 +1,640 @@
+<!doctype html>
+<html lang="es-BO">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#19232d" />
+    <meta name="description" content="Reserva tu departamento en preventa al precio acordado. El anticipo queda protegido en Stellar hasta que se cumpla la condición de pago." />
+    <title>ESQUORA · Reserva en preventa con anticipo protegido</title>
+    <script>
+      (() => {
+        if (performance.getEntriesByType('navigation')[0]?.type !== 'reload') return
+
+        const previousRestoration = history.scrollRestoration
+        history.scrollRestoration = 'manual'
+        if (location.hash) history.replaceState(history.state, '', location.pathname + location.search)
+
+        window.addEventListener('pageshow', () => {
+          window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
+          requestAnimationFrame(() => { history.scrollRestoration = previousRestoration })
+        }, { once: true })
+      })()
+    </script>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=2" />
+    <link rel="preload" href="/fonts/sofia-sans-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="/src/landing/landing.css" />
+    <link rel="stylesheet" href="/src/landing/reservation-demo.css" />
+    <link rel="stylesheet" href="/src/landing/reservation-journey.css" />
+  </head>
+  <body>
+    <a class="skip" href="#contenido">Saltar al contenido</a>
+    <header class="site-header" id="inicio">
+      <nav class="nav" aria-label="Navegación principal">
+        <a class="brand nav-brand" href="#inicio" aria-label="ESQUORA, inicio"><img src="/esquora-logo.svg" alt="" width="284" height="66" /></a>
+        <div class="nav-links">
+          <a href="#como-funciona">Cómo funciona</a>
+          <a href="#promotores">Para promotores</a>
+          <a href="/entrar" class="nav-action"><span>Probar demo</span><span class="arrow" aria-hidden="true"></span></a>
+        </div>
+        <details class="nav-menu">
+          <summary><span class="menu-icon" aria-hidden="true"></span><span class="sr-only">Menú</span></summary>
+          <div class="nav-menu-links">
+            <a href="#como-funciona">Cómo funciona</a>
+            <a href="#promotores">Para promotores</a>
+            <a href="/entrar" class="nav-action"><span>Probar demo</span><span class="arrow" aria-hidden="true"></span></a>
+          </div>
+        </details>
+      </nav>
+      <img class="brand-flight" src="/esquora-logo.svg" alt="" aria-hidden="true" width="284" height="66" hidden />
+    </header>
+
+    <main id="contenido" tabindex="-1">
+      <section class="hero" aria-labelledby="hero-title">
+        <button class="skip motion-control" type="button" hidden>Pausar recorrido</button>
+        <div class="hero-sheet">
+          <div class="hero-wash" aria-hidden="true"></div>
+          <div class="hero-brand frame">
+            <img class="hero-logo" src="/esquora-logo.svg" width="284" height="66" alt="ESQUORA" />
+            <div class="hero-copy">
+              <h1 id="hero-title">Tu departamento en preventa</h1>
+              <p class="hero-qualifier">
+                <span class="sr-only">Con tu dinero protegido, el precio acordado y condiciones claras.</span>
+                <span class="hero-phrase" aria-hidden="true">
+                  <span>Con</span>
+                  <span class="hero-phrase-window">
+                    <span data-phrase data-current>tu dinero protegido.</span>
+                    <span data-phrase>el precio acordado.</span>
+                    <span data-phrase>condiciones claras.</span>
+                  </span>
+                </span>
+              </p>
+            </div>
+          </div>
+
+          <figure class="hero-device" aria-label="Recorrido de una reserva en ESQUORA">
+            <div class="device-body">
+              <img class="device-photo" src="/landing/esquora-celular.webp" srcset="/landing/esquora-celular-600.webp 600w, /landing/esquora-celular.webp 1024w" sizes="(max-width: 600px) 119vw, 590px" fetchpriority="high" width="1024" height="1536" alt="" />
+              <div class="device-screen">
+                <div class="device-status" aria-hidden="true">
+                  <span>9:41</span><span class="device-camera"></span>
+                  <svg viewBox="0 0 37 10" fill="currentColor"><path d="M0 7h2v3H0zm3-2h2v5H3zm3-2h2v7H6zm3-3h2v10H9z"/><path d="M14 3a8 8 0 0 1 11 0m-9 2a5 5 0 0 1 7 0m-5 2a2 2 0 0 1 3 0" fill="none" stroke="currentColor" stroke-width="1.1"/><path d="M19 8.4h1v1h-1zM28 3h7v5h-7zm7 1.3h1V7h-1z"/></svg>
+                </div>
+                <div class="device-content" data-reservation-demo data-unit="304" data-stage="selection">
+                  <div class="demo-heading">
+                    <h2 data-demo-title tabindex="-1">Elige tu unidad</h2>
+                  </div>
+                  <div class="demo-display">
+                    <div class="demo-visual" aria-hidden="true">
+                    <div class="demo-plan">
+                      <svg viewBox="0 0 220 102" fill="none" stroke-linejoin="round">
+                        <defs>
+                          <g id="demo-apartment-lines">
+                            <path d="M8 0H0v76h11m27 0h38V64m0-12V0H31" stroke="#485e73" stroke-width="1.8" />
+                            <path d="M40 0v36H38m-11 0H0m40-11h13m11 0h12" stroke="#485e73" stroke-width="1.45" />
+                            <path d="M8 0h23m-23 2.2h23M11 76h27m-27-2.2h27" stroke="#647f9a" stroke-width=".85" />
+                            <g stroke="#60788e" stroke-width=".85" stroke-linecap="round">
+                              <path d="M38 36V25M27 36a11 11 0 0 1 11-11M53 25V14m0 0a11 11 0 0 1 11 11M76 64H64m0 0a12 12 0 0 1 12-12" />
+                              <rect x="5" y="11" width="23" height="15" rx="1" />
+                              <rect x="7" y="13" width="4" height="5" rx=".9" />
+                              <rect x="7" y="19" width="4" height="5" rx=".9" />
+                              <path d="M13 11v15m-8 5h13v5m-6-5v5" />
+                              <path d="M44 4h7v3h-7zM44.7 7v3.3a2.8 2.8 0 0 0 5.6 0V7" />
+                              <rect x="55" y="4" width="7" height="5.5" rx="1.1" />
+                              <path d="M65 0v15h11m-11 0 10-14" />
+                              <circle cx="72" cy="5" r="1" />
+                              <path d="M51 31h25v10H51zM61 31v10m10-10v10" />
+                              <rect x="54" y="34" width="4.5" height="4" rx=".6" />
+                              <circle cx="64.2" cy="35" r=".85" /><circle cx="67.8" cy="37" r=".85" />
+                              <path d="M9 40h16v3H9zM14 41.5h6" />
+                              <rect x="12" y="52" width="13" height="6" rx="2" />
+                              <rect x="5" y="64" width="27" height="8.5" rx="1.6" />
+                              <path d="M8.5 64v6h20v-6m-10 0v6" />
+                              <rect x="43" y="52" width="16" height="12" rx="1.2" />
+                              <path d="M46 52v-3h5v3m2 0v-3h4v3m-11 12v3h5v-3m2 0v3h4v-3" />
+                            </g>
+                          </g>
+                        </defs>
+                        <path d="M110 20v48" stroke="#8194a7" stroke-width=".8" stroke-dasharray="2 3.5" />
+                        <path d="m107 66 3 4 3-4" stroke="#8194a7" stroke-width=".85" />
+                        <path d="M18 12h76v76H18zm108 0h76v76h-76z" fill="#fcfdfa" />
+                        <rect class="demo-highlight" x="18" y="12" width="76" height="76" fill="#dce9fc" />
+                        <use href="#demo-apartment-lines" x="18" y="12" />
+                        <use href="#demo-apartment-lines" transform="translate(202 12) scale(-1 1)" />
+                        <g class="demo-highlight">
+                          <rect x="14.8" y="8.8" width="82.4" height="82.4" rx="1.35" stroke="#3067cc" stroke-width="1.1" />
+                          <circle cx="90" cy="91.2" r="5.2" fill="#3067cc" stroke="#f6f8f7" />
+                          <path d="m87.8 91.2 1.4 1.4 2.9-3" stroke="#fff" stroke-width="1.05" stroke-linecap="round" />
+                        </g>
+                      </svg>
+                    </div>
+                    <div class="demo-agreement">
+                      <svg viewBox="0 0 220 102" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                        <g transform="rotate(-8 110 51)"><path class="agreement-back" d="M76 18h68v65H76z" fill="#dce6f2" stroke="#7e8da0" /></g>
+                        <g class="agreement-page">
+                          <path d="M84 12h49l11 11v64H84z" fill="#fafbf9" stroke="#526577" />
+                          <path d="M133 12v11h11M95 34h34m-34 9h28m-28 9h34m-34 9h18" stroke="#718294" stroke-width=".8" />
+                          <path class="agreement-ink" pathLength="1" d="M95 73h17m10-3 4 4 8-9" stroke="#3067cc" stroke-width="1.6" />
+                        </g>
+                        <path d="M68 82h7m-3.5-3.5v7m79-58h7m-3.5-3.5v7" stroke="#8492a1" stroke-width=".7" />
+                      </svg>
+                    </div>
+                    <div class="escrow-visual">
+                      <svg viewBox="0 0 220 102" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M62 89h84l23-13m-99 9v7m74-7v7" stroke="#8796a7" stroke-width=".7" />
+                        <g stroke="#526577">
+                          <path d="m69 44 21-12h66l-21 12z" fill="#fdfdfa" /><path d="m135 44 21-12v42l-21 12z" fill="#e0e8ee" />
+                          <path d="M69 44h66v42H69z" fill="#fafbf9" /><path d="M77 51h50v28H77z" fill="#c8d7e3" />
+                          <path d="m132 85 24-13m-15 2 9-5m-9 0 9-5m-9 0 9-5" stroke-width=".65" opacity=".65" />
+                          <g class="escrow-token" stroke="#3067cc">
+                            <path d="M86 18h29v15H86zm3 3h23v9H89z" fill="#e1ecfe" /><ellipse cx="100.5" cy="25.5" rx="3" ry="3.6" />
+                          </g>
+                          <g class="escrow-door">
+                            <path d="M78 52h48v26H78z" fill="#f4f5f2" /><path d="M81 55h42v20H81z" stroke-width=".65" />
+                            <circle cx="102" cy="65" r="7" fill="#e2eaf2" />
+                            <path class="escrow-handle" d="M102 65v-4m0 4 3.5 2m-3.5-2-3.5 2" stroke-width="1.3" />
+                          </g>
+                          <path d="M75 55h5v6h-5zm0 14h5v6h-5z" fill="#e0e8ee" stroke-width=".75" />
+                          <g class="escrow-seal" stroke="none"><circle cx="147" cy="73" r="8.5" fill="#3067cc" /><path d="m143.5 73 2.4 2.4 4.6-5.1" stroke="#fff" stroke-width="1.35" /></g>
+                        </g>
+                      </svg>
+                    </div>
+                    </div>
+                    <div class="demo-options" role="group" aria-label="Elegir departamento" hidden>
+                      <button type="button" data-demo-unit="304" aria-pressed="true"><span>Depto.</span> 304</button>
+                      <button type="button" data-demo-unit="305" aria-pressed="false"><span>Depto.</span> 305</button>
+                    </div>
+                  </div>
+                  <div class="demo-unit-info">
+                    <svg viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 6h9l8 8-7.5 7.5-9.5-9.5z"/><circle cx="8.7" cy="10" r="1.35"/><path d="m11 15 2.2 2.2 4-4"/></svg>
+                    <div><strong>Precio de preventa</strong><p>Se mantiene durante el plazo acordado.</p></div>
+                  </div>
+                  <div class="demo-review" hidden>
+                    <div class="demo-receipt">
+                      <span>Departamento <strong data-review-unit>304</strong></span>
+                      <span>Condición de pago <strong>Inicio de obra</strong></span>
+                    </div>
+                  </div>
+                  <div class="demo-protection" hidden>
+                    <p class="demo-confirmation" data-demo-description>El anticipo entra al contrato.</p>
+                    <div class="demo-receipt" data-demo-receipt hidden>
+                      <span>Unidad <strong data-receipt-unit>304</strong></span>
+                      <span>Cobro <strong>Pendiente de aprobación</strong></span>
+                    </div>
+                  </div>
+                  <ol class="demo-steps" aria-label="Pasos de la reserva">
+                    <li aria-current="step">Unidad</li>
+                    <li>Condición</li>
+                    <li>Anticipo</li>
+                  </ol>
+                </div>
+                <div class="device-home" aria-hidden="true"></div>
+              </div>
+            </div>
+            <div class="device-notification">
+              <span class="notification-symbol" aria-hidden="true">
+                <svg viewBox="0 0 48 48" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                  <defs>
+                    <g id="vault-case"><path d="M10 37v3m28-3v3M7 11h34v26H7z" fill="#253d58" stroke="#dce9ff" stroke-width="1.8" /><path d="M13 16h21v16H13z" fill="#142437" stroke="#769bd7" stroke-width="1.2" /></g>
+                    <g id="vault-door"><rect x="12" y="15" width="23" height="18" rx="1.3" fill="#263c59" stroke="#f4f5f2" stroke-width="1.55" /><path d="M11 19h3m-3 10h3m18-5h-2" stroke="#dce9ff" stroke-width="1.4" /></g>
+                    <g id="vault-handle"><circle cx="23" cy="24" r="4.15" stroke="#f4f5f2" stroke-width="1.45" /><path d="M23 21.7V24l2 1.2m-2-1.2-2 1.2" stroke="#f4f5f2" stroke-width="1.3" /></g>
+                  </defs>
+                  <use href="#vault-case" />
+                  <g class="notification-door"><use href="#vault-door" /><use class="notification-handle" href="#vault-handle" /></g>
+                </svg>
+              </span>
+              <span class="notification-copy"><span>Reserva confirmada</span><strong>Anticipo protegido</strong></span>
+            </div>
+          </figure>
+          <div class="hero-credit">
+            <div class="hero-credit-row">
+              <p>Creado por <strong>ScaleNova</strong></p>
+              <img class="hero-credit-stellar" src="/landing/stellar-white.png" width="447" height="112" alt="Stellar" />
+            </div>
+          </div>
+          <div class="hero-scroll-cue" aria-hidden="true">
+            <span class="scroll-cue-wheel">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round">
+                <rect x="6" y="2.5" width="12" height="19" rx="6" />
+                <path class="scroll-cue-mark" d="M12 7v3" />
+              </svg>
+              <span>Baja para ver más</span>
+            </span>
+            <span class="scroll-cue-swipe">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round">
+                <path d="m8 8 4-4 4 4M12 5v13" opacity=".65" />
+                <circle class="scroll-cue-mark" cx="12" cy="18" r="2.2" fill="currentColor" stroke="none" />
+              </svg>
+              <span>Desliza hacia arriba</span>
+            </span>
+          </div>
+        </div>
+      </section>
+
+      <section class="market frame" id="problema" aria-labelledby="market-title">
+        <div class="market-intro">
+          <h2 id="market-title">Si la obra se detiene,<br /> <em>¿qué pasa con tu dinero?</em></h2>
+          <p>En una preventa, si pagas el adelanto directamente al promotor, puede usar tu dinero antes de cumplir lo acordado. Si incumple, recuperar lo que pagaste puede tomar años.</p>
+        </div>
+
+        <p class="market-estimate">Estimaciones anuales para Bolivia</p>
+        <div class="market-figures">
+          <div class="market-figure market-figure-risk">
+            <p class="market-amount" data-market-amount>
+              <strong class="market-value"><span class="market-number">3,1</span> <span class="market-unit">millones <small>de dólares</small></span></strong>
+            </p>
+            <p class="market-label">al año en adelantos que podrían verse afectados.</p>
+            <p class="market-note">Por incumplimientos o posibles estafas en preventas de viviendas y lotes.</p>
+          </div>
+          <div class="market-context">
+            <div class="market-figure">
+              <p class="market-amount" data-market-amount>
+                <strong class="market-value"><span class="market-number">20–30</span> <span class="market-unit">millones <small>de dólares</small></span></strong>
+              </p>
+              <p class="market-label">al año en adelantos para departamentos en preventa.</p>
+              <p class="market-note">La estimación central es de 26 millones de dólares al año.</p>
+            </div>
+            <div class="market-figure">
+              <p class="market-amount" data-market-amount>
+                <strong class="market-value"><span class="market-number">2.100</span></strong>
+              </p>
+              <p class="market-label">compras al año de departamentos en preventa con adelanto.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="process" id="como-funciona" aria-labelledby="process-title" tabindex="-1">
+        <div class="frame reservation-journey">
+          <div class="journey-board">
+            <h2 id="process-title">Cómo funciona ESQUORA</h2>
+            <div class="journey-stage" data-beat="0" role="group" aria-label="Recorrido de una reserva">
+              <div class="journey-stage-brand">
+                <img src="/esquora-logo.svg" width="284" height="66" alt="ESQUORA" />
+              </div>
+              <svg class="journey-art" viewBox="0 0 720 408" fill="none" aria-hidden="true">
+                <defs>
+                  <linearGradient id="journey-blue" x1="0" y1="0" x2="1" y2="1" gradientUnits="objectBoundingBox">
+                    <stop stop-color="#6799ff"/><stop offset="1" stop-color="#315fcc"/>
+                  </linearGradient>
+                  <linearGradient id="journey-paper" x2="0" y2="1" gradientUnits="objectBoundingBox">
+                    <stop stop-color="#fbfbf4"/><stop offset="1" stop-color="#dae4e9"/>
+                  </linearGradient>
+                  <linearGradient id="journey-metal" x2="0" y2="1" gradientUnits="objectBoundingBox">
+                    <stop stop-color="#2b4c76"/><stop offset="1" stop-color="#182c49"/>
+                  </linearGradient>
+                  <radialGradient id="journey-contact">
+                    <stop stop-color="#040b14" stop-opacity=".75"/><stop offset="1" stop-color="#040b14" stop-opacity="0"/>
+                  </radialGradient>
+                </defs>
+                <ellipse cx="355" cy="350" rx="297" ry="31" fill="url(#journey-contact)"/>
+
+                <g class="journey-drawing" data-drawing="0" data-layer>
+                  <rect x="300" y="49" width="198" height="311" rx="23" fill="#111e32" stroke="#8aaedc" stroke-width="2"/>
+                  <rect x="311" y="61" width="176" height="287" rx="16" fill="url(#journey-paper)"/>
+                  <path d="M376 71h47" stroke="#20324c" stroke-width="5" stroke-linecap="round"/>
+                  <text x="399" y="129" text-anchor="middle" fill="#1c314b" font-size="19" font-weight="730">Entra a ESQUORA</text>
+                  <text x="336" y="166" fill="#395881" font-size="14" font-weight="670">Correo electrónico</text>
+                  <rect x="334" y="178" width="129" height="33" rx="5" fill="#f5f8fa" stroke="#9eb6d2"/>
+                  <path d="M346 194h85" stroke="#8fa7c5" stroke-width="2" stroke-linecap="round"/>
+                  <text x="336" y="244" fill="#395881" font-size="14" font-weight="670">Código de acceso</text>
+                  <g class="journey-access-code">
+                    <rect x="334" y="254" width="129" height="36" rx="6" fill="#e4eefb" stroke="#76a5ed"/>
+                    <path d="M352 272h1m13 0h1m13 0h1m13 0h1m13 0h1m13 0h1" stroke="#2859bb" stroke-width="4.5" stroke-linecap="round"/>
+                  </g>
+                  <g class="journey-access-mail">
+                    <rect x="140" y="153" width="115" height="82" rx="12" fill="url(#journey-metal)" stroke="#8bb4f3" stroke-width="1.6"/>
+                    <path d="M163 176h69v38h-69zm0 0 34.5 24 34.5-24" stroke="#d7e7ff" stroke-width="2" stroke-linejoin="round"/>
+                    <path class="journey-trace" pathLength="1" d="M255 201h15l21 22h20" stroke="#a8c6f2" stroke-width="1.7"/>
+                  </g>
+                  <g class="journey-access-confirm">
+                    <circle cx="460" cy="291" r="15" fill="#2859bb" stroke="#dceaff" stroke-width="2"/>
+                    <path d="m454 291 4 4 8-9" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                  </g>
+                  <path d="M374 331h48" stroke="#94a8bf" stroke-width="2.5" stroke-linecap="round"/>
+                </g>
+
+                <g class="journey-drawing" data-drawing="1">
+                  <g class="journey-object" stroke-linejoin="round">
+                    <path d="m104 139 58-33h252l-58 33z" fill="#284669" stroke="#809ed0" stroke-width="1.5"/>
+                    <path d="m356 139 58-33v180l-58 33z" fill="#132945" stroke="#809ed0" stroke-width="1.5"/>
+                    <path d="M104 139h252v180H104z" fill="url(#journey-metal)" stroke="#8daee0" stroke-width="1.5"/>
+                    <path d="M188 139v180m84-180v180M104 199h252m-252 60h252m0-60 58-33m-58 93 58-33m-29-104v180M188 139l58-33m26 33 58-33" stroke="#7798c7" stroke-width="1.5"/>
+                    <path d="M154 149v170m72-213-72 43m-50 80h168" stroke="#9ab7da" stroke-opacity=".22" stroke-dasharray="3 5"/>
+                    <g class="journey-unit">
+                      <path d="M272 199h84v60h-84z" fill="url(#journey-blue)" stroke="#c1d7ff" stroke-width="1.5"/>
+                      <path d="m356 199 13-7v60l-13 7z" fill="#285090" stroke="#a9c8fb" stroke-width="1.4"/>
+                      <path d="M283 210h8m-8 0v8m62 30h-8m8 0v-8" stroke="#e7f0ff" stroke-width="1.5"/>
+                    </g>
+                  </g>
+                  <path class="journey-trace" pathLength="1" d="M367 227h35l28-24h29" stroke="#b7d0fb" stroke-width="1.5"/>
+                  <g class="journey-document">
+                    <path d="M446 85h154l21 21v213H446z" fill="#140f16" opacity=".3" transform="translate(7 8)"/>
+                    <path d="M446 85h154l21 21v213H446z" fill="url(#journey-paper)"/>
+                    <path d="M600 85v21h21" fill="#bccedf" stroke="#bccedf"/>
+                    <path d="M467 125h22l6-4h9v18h-37z" stroke="#285bb5" stroke-width="1.5"/>
+                    <text x="467" y="170" fill="#1c314b" font-size="23" font-weight="730">Reserva</text>
+                    <path d="M467 204h127m-127 15h102m-102 15h115" stroke="#97aeca" stroke-width="2" stroke-linecap="round"/>
+                    <path d="M467 279h127" stroke="#a9b9ca"/>
+                    <path class="journey-signature" pathLength="1" d="M471 276c26-26 39-24 20-6-10 9 10-3 18-7-7 12 7 7 14 3l15 1" stroke="#2859bb" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+                    <g class="journey-confirmation">
+                      <circle cx="582" cy="272" r="12" fill="#d2e1f4" stroke="#9ab8df"/>
+                      <path d="m578 272 3 3 5-6" stroke="#2859bb" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+                    </g>
+                  </g>
+                </g>
+
+                <g class="journey-drawing" data-drawing="2">
+                  <path d="M125 222h189" stroke="#89aad8" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="3 7"/>
+                  <path d="m260 214 8 8-8 8" stroke="#bbd1f0" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                  <g class="journey-object">
+                    <path d="m304 133 55-33h188l-55 33z" fill="#507bc2" stroke="#a3c3ef" stroke-width="1.7" stroke-linejoin="round"/>
+                    <path d="m492 133 55-33v175l-55 33z" fill="#172f53" stroke="#95b4dc" stroke-width="1.7" stroke-linejoin="round"/>
+                    <path d="M304 133h188v175H304z" fill="url(#journey-metal)" stroke="#a3c3ef" stroke-width="2"/>
+                    <path d="M323 151h150v138H323z" fill="#102039" stroke="#769bd0" stroke-width="2"/>
+                    <path d="M304 302h188v6H304z" fill="#1a365a"/>
+                    <path d="M322 308v13h19v-13m114 0v13h19v-13" stroke="#8cace1" stroke-width="2" stroke-linejoin="round"/>
+                    <path d="M512 154v114m11-120v113m11-119v113" stroke="#7199ce" stroke-opacity=".31" stroke-width="1.5"/>
+                    <g class="journey-deposit-token">
+                      <circle cx="152" cy="222" r="39" fill="#2d58a9" stroke="#aacbff" stroke-width="1.5"/>
+                      <circle cx="152" cy="222" r="31" stroke="#9ec2f3" stroke-opacity=".6"/>
+                      <text x="152" y="233" text-anchor="middle" fill="#e9f2ff" font-size="34" font-weight="720">$</text>
+                    </g>
+                    <g class="journey-vault-door">
+                      <rect x="323" y="150" width="151" height="140" rx="13" fill="url(#journey-blue)" stroke="#c5dcff" stroke-width="2"/>
+                      <rect x="334" y="161" width="129" height="118" rx="7" stroke="#a1c2fa" stroke-width="1.4"/>
+                      <path d="M332 175v19m0 52v19" stroke="#e9f3ff" stroke-width="6" stroke-linecap="round"/>
+                      <circle cx="396" cy="220" r="26" fill="#2d58a9" stroke="#dbeaff" stroke-width="2"/>
+                      <path class="journey-vault-handle" d="M396 220v-14m0 14 13 7m-13-7-13 7" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+                      <circle cx="396" cy="220" r="4" fill="#eef5ff"/>
+                      <path d="M445 218h11" stroke="#e9f3ff" stroke-width="4" stroke-linecap="round"/>
+                    </g>
+                  </g>
+                  <g class="journey-deposit-sent">
+                    <circle cx="152" cy="222" r="39" fill="#1a355a" stroke="#7eaae6" stroke-width="1.5"/>
+                    <path d="m139 222 9 9 17-18" stroke="#d5e6ff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                  </g>
+                  <text x="152" y="286" text-anchor="middle" fill="#dceaff" font-size="16" font-weight="640">Adelanto</text>
+                </g>
+
+                <g class="journey-drawing" data-drawing="3">
+                  <g class="journey-object" stroke-linejoin="round">
+                    <path d="m86 275 61-36h217l-61 36z" fill="#406893" stroke="#a5c1e6" stroke-width="1.6"/>
+                    <path d="M86 275h217v26H86z" fill="#294c75" stroke="#86a5d0" stroke-width="1.6"/>
+                    <path d="m303 275 61-36v26l-61 36z" fill="#182d48" stroke="#86a5d0" stroke-width="1.6"/>
+                    <path d="m137 250 53-31h28l-54 31z" fill="#aec7ea" stroke="#d5e5fc" stroke-width="1.5"/>
+                    <path d="M137 250h27v12h-27zm82 0h27v12h-27z" fill="#547fb6" stroke="#b0cbeb" stroke-width="1.5"/>
+                    <path d="m164 250 54-31v12l-54 31zm82 0 54-31v12l-54 31z" fill="#294e7b" stroke="#b0cbeb" stroke-width="1.5"/>
+                    <path d="m219 250 54-31h27l-54 31z" fill="#aec7ea" stroke="#d5e5fc" stroke-width="1.5"/>
+                    <path d="M150 239v-81l56-33h86v95m-142-62h86l56-33m-56 33v81" stroke="#c6dcff" stroke-width="2"/>
+                    <path d="M150 188h86l56-33m-98 3v55" stroke="#94b6e1" stroke-width="1.5"/>
+                    <path d="M102 287h184" stroke="#7899c7" stroke-opacity=".48" stroke-dasharray="4 5"/>
+                  </g>
+                  <path class="journey-trace" pathLength="1" d="M298 178h65l31-27h32" stroke="#b7d0fb" stroke-width="1.5"/>
+                  <g class="journey-document">
+                    <path d="M406 75h169l24 23v218H406z" fill="#140f16" opacity=".34" transform="translate(7 8)"/>
+                    <path d="M406 75h169l24 23v218H406z" fill="url(#journey-paper)"/>
+                    <path d="M575 75v23h24" fill="#bccedf" stroke="#bccedf"/>
+                    <text x="430" y="121" fill="#1c314b" font-size="23" font-weight="730">Acta de inicio</text>
+                    <path class="journey-evidence-line" pathLength="1" d="M429 152h107" stroke="#6c99df" stroke-width="2.2" stroke-linecap="round"/>
+                    <text x="430" y="144" fill="#345d96" font-size="15" font-weight="630">Inicio de obra</text>
+                    <path d="M430 168h145m-145 15h134m-134 15h112m-112 15h133m-133 15h81" stroke="#97aeca" stroke-width="2" stroke-linecap="round"/>
+                    <circle class="journey-approval-seal" cx="543" cy="264" r="29" fill="#d9e7f8" stroke="#7da6e2" stroke-width="1.5"/>
+                    <path class="journey-approval" pathLength="1" d="m530 264 9 9 16-18" stroke="#2758ba" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M430 277h62" stroke="#97aeca" stroke-width="2" stroke-linecap="round"/>
+                  </g>
+                </g>
+
+                <g class="journey-drawing" data-drawing="4">
+                  <g class="journey-document">
+                    <path d="M139 71h210v257l-15-8-15 8-15-8-15 8-15-8-15 8-15-8-15 8-15-8-15 8-15-8-15 8-15-8-15 8z" fill="#140f16" opacity=".3" transform="translate(7 8)"/>
+                    <path d="M139 71h210v257l-15-8-15 8-15-8-15 8-15-8-15 8-15-8-15 8-15-8-15 8-15-8-15 8-15-8-15 8z" fill="url(#journey-paper)"/>
+                    <text x="165" y="116" fill="#1c314b" font-size="23" font-weight="730">Comprobante</text>
+                    <text x="165" y="142" fill="#345d96" font-size="16" font-weight="630">Pago registrado</text>
+                    <path d="M165 165h156" stroke="#8da6c2" stroke-dasharray="4 4"/>
+                    <path d="M165 185h86m-86 15h111m-111 15h63" stroke="#97aeca" stroke-width="2" stroke-linecap="round"/>
+                  </g>
+                  <path class="journey-trace" pathLength="1" d="M350 199h51l32-23h39" stroke="#b7d0fb" stroke-width="1.8"/>
+                  <g class="journey-ledger">
+                    <path d="m532 116 74 43v84l-74 43-74-43v-84z" fill="#213e64" stroke="#86aade" stroke-width="1.65"/>
+                    <g class="journey-ledger-routes" stroke="#9fbeee" stroke-width="1.45">
+                      <path pathLength="1" d="M532 201v-85"/><path pathLength="1" d="m532 201 74-42"/><path pathLength="1" d="m532 201 74 42"/>
+                      <path pathLength="1" d="M532 201v85"/><path pathLength="1" d="m532 201-74 42"/><path pathLength="1" d="m532 201-74-42"/>
+                    </g>
+                    <g fill="#85b4ff" stroke="#c3ddff" stroke-width="1.5">
+                      <circle cx="532" cy="116" r="5"/><circle cx="606" cy="159" r="5"/><circle cx="606" cy="243" r="5"/>
+                      <circle cx="532" cy="286" r="5"/><circle cx="458" cy="243" r="5"/><circle cx="458" cy="159" r="5"/>
+                    </g>
+                    <circle class="journey-approval-seal" cx="532" cy="201" r="24" fill="#d9eaff" stroke="#9ac1fe" stroke-width="2"/>
+                    <path class="journey-approval" pathLength="1" d="m522 201 7 7 13-14" stroke="#2859ba" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                    <text x="532" y="320" text-anchor="middle" fill="#dceaff" font-size="16" font-weight="650">Registro público</text>
+                  </g>
+                </g>
+              </svg>
+              <nav class="journey-nav" aria-label="Pasos de la reserva">
+                <a href="#paso-acceso"><span aria-hidden="true">01</span> Acceso</a>
+                <a href="#paso-acuerdo"><span aria-hidden="true">02</span> Acuerdo</a>
+                <a href="#paso-deposito"><span aria-hidden="true">03</span> Depósito</a>
+                <a href="#paso-avance"><span aria-hidden="true">04</span> Avance</a>
+                <a href="#paso-comprobante"><span aria-hidden="true">05</span> Registro</a>
+              </nav>
+            </div>
+            <ol class="journey-steps" role="list">
+              <li class="journey-step" id="paso-acceso" tabindex="-1">
+                <div class="journey-step-copy">
+                  <h3>Entra con tu correo.</h3>
+                  <p>Abre la invitación que te envía el promotor y entra a ESQUORA con el código que recibes por correo.</p>
+                  <div class="journey-partner">
+                    <img src="/landing/pollar-logo.png" width="400" height="82" alt="Pollar" loading="lazy" />
+                    <span>Verificación de acceso</span>
+                  </div>
+                </div>
+              </li>
+              <li class="journey-step" id="paso-acuerdo" tabindex="-1">
+                <div class="journey-step-copy">
+                  <h3>Revisa y firma el acuerdo.</h3>
+                  <p>El promotor prepara la reserva. Revisa la unidad, el precio, el plazo y qué se debe cumplir para liberar el pago. Si estás de acuerdo, firma en la app.</p>
+                </div>
+              </li>
+              <li class="journey-step" id="paso-deposito" tabindex="-1">
+                <div class="journey-step-copy">
+                  <h3>Tu dinero queda protegido.</h3>
+                  <p>El dinero queda retenido en un contrato en Stellar. El promotor comprueba el depósito y aparta tu unidad.</p>
+                  <div class="journey-partner">
+                    <span class="journey-partner-lockup"><img src="/landing/trustless-work-mark.png" width="19" height="19" alt="" loading="lazy" /> Trustless Work</span>
+                    <span>Contrato de pago condicionado</span>
+                  </div>
+                </div>
+              </li>
+              <li class="journey-step" id="paso-avance" tabindex="-1">
+                <div class="journey-step-copy">
+                  <h3>Tú revisas el avance.</h3>
+                  <p>El promotor presenta la evidencia pactada. Si confirmas que cumple la condición, puede cobrar.</p>
+                </div>
+              </li>
+              <li class="journey-step" id="paso-comprobante" tabindex="-1">
+                <div class="journey-step-copy">
+                  <h3>Comprueba adónde fue tu dinero.</h3>
+                  <p>Cuando se paga o se devuelve el anticipo, ambas partes pueden verificar quién recibió el dinero y cuánto.</p>
+                  <div class="journey-partner">
+                    <img src="/landing/stellar-black.png" width="447" height="112" alt="Stellar" loading="lazy" />
+                    <span>Registro verificable</span>
+                  </div>
+                </div>
+              </li>
+            </ol>
+          </div>
+        </div>
+      </section>
+
+      <section class="reservation-finish" id="reserva-desde-la-app" aria-labelledby="finish-title">
+        <div class="frame finish-grid">
+          <div class="finish-copy">
+            <h2 id="finish-title">Reservar en preventa, <em>así de simple.</em></h2>
+            <p>Firma tu acuerdo, revisa el avance y consulta el estado de tu dinero desde ESQUORA. La app se encarga de la parte técnica.</p>
+            <a class="button finish-action" href="/entrar">Probar demo <span class="arrow" aria-hidden="true"></span></a>
+          </div>
+          <div class="finish-art" aria-hidden="true">
+            <div class="finish-tablet">
+              <div class="finish-screen">
+                <div class="finish-screen-header">
+                  <img src="/esquora-logo.svg" width="284" height="66" alt="" loading="lazy" />
+                  <span>Mi compra</span>
+                </div>
+                <div class="finish-screen-body">
+                  <div class="finish-screen-overview">
+                    <div class="finish-screen-summary">
+                      <span class="finish-screen-title">Depto. A-302</span>
+                      <span class="finish-screen-project">Edificio Curupaú</span>
+                      <div class="finish-protected">
+                        <span class="finish-protected-label">Dinero protegido</span>
+                        <div class="finish-protected-amount"><span>USD</span><strong>6.000</strong></div>
+                        <span class="finish-initial">Cuota inicial de USD 12.000</span>
+                      </div>
+                    </div>
+                    <figure class="finish-screen-plan">
+                      <svg viewBox="0 0 218 240" fill="none">
+                        <g stroke="#476080" stroke-width="1.2" stroke-linejoin="round">
+                          <path d="m56 31 24-13h33L89 31zm33-13 24-13h29l-24 13zm29 13 24-13h48l-24 13z" fill="#d5e1f3"/>
+                          <path d="m118 18 24-13v13l-24 13zm48 13 24-13v188l-24 13z" fill="#bfcee5"/>
+                          <path d="M56 219V31h33V18h29v13h48v188z" fill="#e4ecf8" stroke="#233a59" stroke-width="1.5"/>
+                        </g>
+                        <path d="M56 49h110m-110 17h110m-110 17h110m-110 17h110m-110 17h110m-110 17h110m-110 17h110m-110 17h110m-110 17h110m-110 17h110M83.5 31v188M111 31v188m27.5-188v188" stroke="#536d92" stroke-width="1" stroke-dasharray="2 2.5" opacity=".73"/>
+                        <path d="m166 66 24-13m-24 47 24-13m-24 47 24-13m-24 47 24-13m-24 47 24-13" stroke="#7186a5" stroke-width="1"/>
+                        <path d="M56 185h110m-110 17h110" stroke="#233a59" stroke-width="1.1"/>
+                        <g class="finish-plan-unit">
+                          <rect x="83.5" y="168" width="27.5" height="17" fill="#234eba"/>
+                          <path d="M36 176.5h45" stroke="#234eba" stroke-width="1.4"/>
+                          <circle cx="35" cy="176.5" r="2.3" fill="#234eba"/>
+                        </g>
+                        <path d="M56 225v8m110-8v8m-110-4h110" stroke="#94a7c1" stroke-width="1"/>
+                      </svg>
+                    </figure>
+                  </div>
+                  <div class="finish-conditions">
+                    <div class="finish-conditions-heading">
+                      <strong>Condiciones de pago</strong>
+                      <div class="finish-condition-meter"><span></span><span></span></div>
+                    </div>
+                    <ul class="finish-condition-list">
+                      <li class="finish-condition">
+                        <span class="finish-condition-mark"></span>
+                        <div><strong>Documentación del proyecto</strong><span>Entregado al promotor</span></div>
+                        <strong>USD 6.000</strong>
+                      </li>
+                      <li class="finish-condition finish-condition-held">
+                        <span class="finish-condition-mark"></span>
+                        <div><strong>Inicio de obra</strong><span>En revisión</span></div>
+                        <strong>USD 6.000</strong>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="developers frame" id="promotores" aria-labelledby="developers-title" tabindex="-1">
+        <div class="developer-header">
+          <h2 id="developers-title">Lleva tu preventa <em>a otras ciudades.</em></h2>
+          <div class="developer-copy">
+            <p>Envíale un enlace de ESQUORA a quien ya eligió un departamento. Desde su ciudad, puede revisar el acuerdo, firmar y depositar un adelanto protegido.</p>
+            <p>Tu equipo confirma el depósito y puede cobrar cuando el comprador aprueba la evidencia del avance acordado.</p>
+            <a class="button" href="/entrar">Probar demo <span class="arrow" aria-hidden="true"></span></a>
+          </div>
+        </div>
+        <div class="developer-illustration" aria-hidden="true">
+          <div class="developer-site">
+            <svg class="developer-building" viewBox="0 0 310 240" fill="none">
+              <path d="m33 196 45-27h191l-45 27z" fill="#d6e1f0" stroke="#95abc8" stroke-width="1.2" stroke-linejoin="round"/>
+              <path d="M33 196h191v9H33zm191 0 45-27v9l-45 27z" fill="#c1d1e7" stroke="#95abc8" stroke-width="1.2" stroke-linejoin="round"/>
+              <path d="m63 108 27-16h35l-27 16zM63 108h35v68H63z" fill="#dae5f3" stroke="#849bb9" stroke-width="1.25" stroke-linejoin="round"/>
+              <path d="M63 130h35m-35 23h35m-18-45v68" stroke="#8ea5c3" stroke-width="1.2"/>
+              <g stroke="#4a6489" stroke-width="1.45" stroke-linejoin="round">
+                <path d="m98 63 31-18h19l-31 18zm19-13 31-18h42l-31 18zm42 13 31-18h35l-31 18z" fill="#d5e3f6"/>
+                <path d="m159 50 31-18v13l-31 18zm35 13 31-18v129l-31 18z" fill="#b9cbe4"/>
+                <path d="M98 63h19V50h42v13h35v129H98z" fill="#eef3fa"/>
+              </g>
+              <path d="M98 88h96m-96 26h96m-96 26h96m-96 26h96M130 63v129m32-129v129m32-104 31-18m-31 44 31-18m-31 44 31-18m-31 44 31-18" stroke="#7089ad" stroke-width="1.15"/>
+              <path d="M130 114h32v26h-32z" fill="#234eba"/>
+              <path d="m140 127 4 4 7-8" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M98 212v7m96-7v7m-96-3.5h96" stroke="#8ca5c7" stroke-width="1.15"/>
+            </svg>
+            <span class="developer-diagram-label">Tu proyecto</span>
+          </div>
+          <svg class="developer-connection" viewBox="0 0 220 68" preserveAspectRatio="none" fill="none">
+            <path d="M5 49h53c26 0 27-30 54-30h98" stroke="#9aafcc" stroke-width="1.3" stroke-dasharray="3 4" vector-effect="non-scaling-stroke"/>
+            <path class="developer-connection-line" d="M5 49h53c26 0 27-30 54-30h98" pathLength="1" stroke="#234eba" stroke-width="1.7" vector-effect="non-scaling-stroke"/>
+            <path d="m204 13 7 6-7 6" stroke="#234eba" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+          </svg>
+          <div class="developer-recipient">
+            <div class="developer-invitation">
+              <svg class="developer-invite-icon" viewBox="0 0 32 32" fill="none">
+                <path d="m13 19 6-6m-2-4 2-2a5 5 0 0 1 7 7l-3 3a5 5 0 0 1-7 0m-1 6-2 2a5 5 0 0 1-7-7l3-3a5 5 0 0 1 7 0" stroke="currentColor" stroke-width="1.55" stroke-linecap="round"/>
+              </svg>
+              <strong class="developer-invite-title">Invitación a reservar</strong>
+              <span class="developer-invite-protection">Adelanto protegido</span>
+              <dl class="developer-invite-term"><div><dt>Condición de pago</dt><dd>Inicio de obra</dd></div></dl>
+            </div>
+            <span class="developer-diagram-label">Comprador en otra ciudad</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="faq frame" id="preguntas" aria-labelledby="faq-title" tabindex="-1">
+        <h2 id="faq-title">Preguntas frecuentes</h2>
+        <div class="faq-list">
+          <details><summary>¿Quién guarda el anticipo?</summary><p>El dinero queda en un contrato de Trustless Work en Stellar. El contrato aplica las autorizaciones acordadas para mover los fondos.</p></details>
+          <details><summary>¿Quién aprueba el avance de obra?</summary><p>El comprador revisa y aprueba la evidencia que presenta el promotor. Ambos definen esa evidencia antes de la reserva. Si surge un desacuerdo, interviene el tercero que designaron.</p></details>
+          <details><summary>¿Qué pasa si vence el plazo?</summary><p>Si el promotor no acredita lo acordado a tiempo, puedes pedir la devolución. Si hay un desacuerdo, el dinero sigue protegido mientras el tercero designado resuelve el caso.</p></details>
+          <details><summary>¿Necesito saber de Stellar para usar ESQUORA?</summary><p>No. Puedes entrar con tu correo y firmar desde ESQUORA. Consultar los comprobantes en Stellar es opcional.</p></details>
+          <details><summary>¿Puedo enviar dinero real en esta versión?</summary><p>La aplicación funciona en Stellar Testnet, una red de pruebas con fondos de prueba.</p></details>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="frame footer-top">
+        <div class="footer-action">
+          <h2>Tu próxima reserva.</h2>
+          <a class="button" href="/entrar">Probar demo <span class="arrow" aria-hidden="true"></span></a>
+        </div>
+        <div class="footer-contact">
+          <h3>¿Te interesa saber más?</h3>
+          <a class="footer-contact-link" href="https://wa.me/59169600637">
+            <span>Escríbenos por WhatsApp</span>
+            <strong>+591 69600637 <span class="arrow" aria-hidden="true"></span></strong>
+          </a>
+        </div>
+      </div>
+      <div class="frame footer-bottom">
+        <a class="brand" href="#inicio" aria-label="ESQUORA, volver al inicio"><img src="/esquora-logo.svg" alt="" width="148" height="31" /></a>
+        <nav aria-label="Navegación del pie de página"><a href="#como-funciona">Cómo funciona</a><a href="#preguntas">Preguntas frecuentes</a></nav>
+        <a class="top-link" href="#inicio">Volver arriba <span class="arrow arrow-up" aria-hidden="true"></span></a>
+      </div>
+    </footer>
+
+    <script type="module" src="/src/landing/landing.ts"></script>
+  </body>
+</html>

@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict'
 import { createHash, randomBytes } from 'node:crypto'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { dirname, join } from 'node:path'
 import test from 'node:test'
 import { Hono } from 'hono'
+import { mountPublicLanding } from '../server/landing.ts'
 import { privateAccess } from '../server/private-access.ts'
 
 const origin = 'https://example.test'
@@ -26,6 +30,57 @@ function unlock(app: Hono, accessCode: string, next = '/entrar', requestOrigin =
     body: new URLSearchParams({ code: accessCode, next }),
   })
 }
+
+test('the landing and its build assets are public while the demo keeps the existing gate', async (t) => {
+  const dist = mkdtempSync(join(tmpdir(), 'esquora-landing-'))
+  t.after(() => rmSync(dist, { recursive: true, force: true }))
+  const files = {
+    'conoce/index.html': '<h1>ESQUORA</h1><a href="/entrar">Probar demo</a>',
+    'assets/landing.js': 'landing bundle',
+    'assets/shared.js': 'shared dependency',
+    'assets/landing.css': 'landing style',
+    'assets/app.js': 'private app bundle',
+    'landing/phone.webp': 'public image',
+    '.vite/manifest.json': JSON.stringify({
+      'conoce/index.html': { file: 'assets/landing.js', css: ['assets/landing.css'], imports: ['shared'] },
+      'index.html': { file: 'assets/app.js' },
+      shared: { file: 'assets/shared.js' },
+    }),
+  }
+  for (const [path, content] of Object.entries(files)) {
+    const target = join(dist, path)
+    mkdirSync(dirname(target), { recursive: true })
+    writeFileSync(target, content)
+  }
+  const app = new Hono()
+  mountPublicLanding(app, dist)
+  app.use('*', privateAccess({ origin, credentials: credentials(code) }))
+  app.get('/entrar', (c) => c.text('Entra a tu cuenta'))
+  app.get('/api/me', (c) => c.json({ user: null }))
+  app.get('/assets/app.js', (c) => c.text('private app bundle'))
+
+  const canonical = await app.request(origin + '/conoce?ref=demo')
+  assert.equal(canonical.status, 308)
+  assert.equal(canonical.headers.get('Location'), '/conoce/?ref=demo')
+  const landing = await app.request(origin + '/conoce/')
+  assert.equal(landing.status, 200)
+  assert.match(await landing.text(), /href="\/entrar"/)
+  for (const path of ['assets/landing.js', 'assets/shared.js', 'assets/landing.css', 'landing/phone.webp'] as const) {
+    const response = await app.request(origin + '/' + path)
+    assert.equal(response.status, 200)
+    assert.equal(await response.text(), files[path])
+  }
+  for (const path of ['/assets/app.js', '/api/me', '/.vite/manifest.json']) {
+    assert.equal((await app.request(origin + path)).status, 403)
+  }
+  const demo = await app.request(origin + '/entrar', { headers: { Accept: 'text/html' } })
+  assert.equal(demo.status, 403)
+  assert.match(await demo.text(), /name="next" value="\/entrar"/)
+  const unlocked = await unlock(app, code)
+  assert.equal(unlocked.status, 303)
+  const headers = { Cookie: unlocked.headers.get('Set-Cookie')!.split(';')[0] }
+  assert.equal(await (await app.request(origin + '/entrar', { headers })).text(), 'Entra a tu cuenta')
+})
 
 test('the outer gate blocks application pages, assets and APIs even with an application cookie', async () => {
   const app = testApp()

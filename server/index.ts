@@ -7,18 +7,20 @@ import { APP_URL, PORT, ROOT, TEST_AUTH_TOKEN, validateConfig } from './config.t
 import { app } from './app.ts'
 import { reconcileQueue, recoverPending } from './chain.ts'
 import { notifyExpiredRefunds } from './domain.ts'
+import { mountPublicLanding } from './landing.ts'
 import { privateAccess } from './private-access.ts'
 import { bootstrap } from './stellar.ts'
 
 validateConfig()
 const credentials = process.env.ESQUORA_PREVIEW_CREDENTIALS?.trim() ?? ''
 const server = new Hono()
+const dist = join(ROOT, 'dist')
+mountPublicLanding(server, dist)
 if (process.env.NODE_ENV === 'production' || credentials) {
   server.use('*', privateAccess({ origin: APP_URL, credentials }))
 }
 server.all('*', (c) => app.fetch(c.req.raw))
 
-const dist = join(ROOT, 'dist')
 const entry = join(dist, 'index.html')
 if (existsSync(entry)) {
   const index = readFileSync(entry, 'utf8')

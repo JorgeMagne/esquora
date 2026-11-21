@@ -3,6 +3,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY index.html vite.config.ts tsconfig.json ./
+COPY conoce ./conoce
 COPY public ./public
 COPY src ./src
 COPY server ./server
