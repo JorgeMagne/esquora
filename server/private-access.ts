@@ -14,21 +14,21 @@ const MAX_CLIENTS = 2048
 const codeDigest = (value: string) => createHash('sha256').update(value)
 
 const styles = `
-  :root { color-scheme: light; background: #f5f6f8; color: #17212d; font: 16px/1.5 system-ui, sans-serif; }
+  :root { color-scheme: light; background: #f4f5f2; color: #19232d; font: 16px/1.5 system-ui, sans-serif; }
   *, *::before, *::after { box-sizing: border-box; }
   body { min-height: 100svh; margin: 0; padding: 24px; display: grid; place-items: center; }
-  main { width: min(100%, 420px); padding: clamp(20px, 5vw, 36px); background: white; border: 1px solid #d5dce4; border-radius: 12px; }
+  main { width: min(100%, 420px); padding: clamp(20px, 5vw, 36px); background: white; border: 1px solid #d2dbe1; border-radius: 12px; }
   h1 { margin: 0; font-size: 1.65rem; line-height: 1.2; }
-  p { margin: 12px 0 24px; color: #475463; }
+  p { margin: 12px 0 24px; color: #4d5c69; }
   form { display: grid; gap: 10px; }
   label { font-weight: 600; }
   input, button { min-width: 0; min-height: 48px; border-radius: 6px; font: inherit; }
-  input { color: inherit; padding: 8px 12px; border: 1px solid #7e8995; }
-  input:focus { border-color: #1460a5; }
-  button { margin-top: 6px; border: 0; padding: 8px 12px; color: white; background: #243b53; cursor: pointer; font-weight: 650; }
-  button:hover { background: #172839; }
-  :focus-visible { outline: 3px solid #1460a5; outline-offset: 3px; }
-  [role=alert] { color: #9e2c26; margin: 0; }
+  input { color: inherit; padding: 8px 12px; border: 1px solid #718292; }
+  input:focus { border-color: #3067cc; }
+  button { margin-top: 6px; border: 0; padding: 8px 12px; color: #f4f5f2; background: #19232d; cursor: pointer; font-weight: 650; }
+  button:hover { background: #2a3d51; }
+  :focus-visible { outline: 3px solid #3067cc; outline-offset: 3px; }
+  [role=alert] { color: #892837; margin: 0; }
   @media (prefers-reduced-motion: no-preference) {
     input { transition: border-color 150ms ease; }
     button { transition: background-color 150ms ease; }
@@ -47,6 +47,7 @@ function accessPage(c: Context, target: string, status: 403 | 429, error?: strin
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#19232D">
   <title>Acceso privado</title>
   <style>${styles}</style>
 </head>

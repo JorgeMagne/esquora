@@ -122,6 +122,50 @@ function sign(key: Keypair, termsDigest: string) {
   return Buffer.from(key.sign(digest)).toString('base64')
 }
 
+test('la reserva fija los documentos revisados y protege la unidad y el plazo de depósito', async () => {
+  const { projectRequirements } = await import('../shared/reservation.ts')
+  const { seller, id } = await project('reserva')
+  const buyer = await account('reserva-buyer@example.test', 'buyer')
+  const upload = async (name: string) => {
+    const body = new FormData()
+    body.set('file', new File([name], name + '.pdf', { type: 'application/pdf' }))
+    return json<{ id: string }>(await app.request('/api/files', { method: 'POST', headers: { Cookie: seller.cookie }, body }))
+  }
+  const projectFiles: Record<string, string> = {}
+  const body = {
+    ...draftPayload(id, buyer.email), agreementKind: 'reservation', reviewed: true, projectFiles,
+    professional: 'Profesional designado', startCondition: 'Excavación del bloque A',
+    startDeadline: new Date(Date.now() + 60_000).toISOString(), contractFileId: (await upload('contrato')).id,
+  }
+  const create = () => request('/api/ops', { method: 'POST', cookie: seller.cookie, body })
+  assert.equal((await create()).status, 409)
+  for (const { key } of projectRequirements) {
+    projectFiles[key] = (await upload(key)).id
+    await json(await request('/api/projects/' + id + '/docs', { method: 'POST', cookie: seller.cookie, body: { reqKey: key, fileId: projectFiles[key] } }))
+  }
+  const first = await json<{ id: string; terms: string; tranches: { amount: number; title: string }[] }>(await create())
+  assert.deepEqual(first.tranches.map(t => [t.title, t.amount]), [['Inicio de obra', body.deposit]])
+  assert.equal(JSON.parse(first.terms).reserva.documents.length, 4)
+  const other = await json<{ id: string }>(await create())
+  const previousFile = projectFiles.permiso_construccion
+  const updatedFile = (await upload('permiso-nuevo')).id
+  await json(await request('/api/projects/' + id + '/docs', { method: 'POST', cookie: seller.cookie, body: { reqKey: 'permiso_construccion', fileId: updatedFile } }))
+  assert.equal((await create()).status, 409)
+  db.prepare("UPDATE operations SET status = 'awaiting_deposit' WHERE id = ?").run(first.id)
+  const asBuyer = { cookie: buyer.cookie }
+  assert.equal((await request('/api/files/' + previousFile, asBuyer)).status, 200)
+  assert.equal((await request('/api/files/' + updatedFile, asBuyer)).status, 404)
+  const order = await json<{ id: string; expiresAt: string }>(await request('/api/ops/' + first.id + '/deposit', { ...asBuyer, method: 'POST' }))
+  assert.equal(order.expiresAt, body.startDeadline)
+  db.prepare("UPDATE operations SET status = 'funded' WHERE id = ?").run(other.id)
+  db.prepare("UPDATE operations SET escrow_contract_id = 'test' WHERE id = ?").run(first.id)
+  const pay = () => request('/api/anchor/orders/' + order.id + '/pay', { ...asBuyer, method: 'POST' })
+  assert.match(await (await pay()).text(), /unidad ya tiene una reserva/)
+  db.prepare("UPDATE operations SET status = 'cancelled' WHERE id = ?").run(other.id)
+  db.prepare("UPDATE tranches SET due_at = '2020-01-01T00:00:00.000Z' WHERE op_id = ?").run(first.id)
+  assert.match(await (await pay()).text(), /Venció el plazo/)
+})
+
 test('guarda siete tramos personalizados sin adjunto ni tercero y reserva la firma hasta que haya resolutor', async () => {
   const { seller, id } = await project('pending')
   const body = { ...draftPayload(id, 'pending-buyer@example.test', 7), resolutionMode: 'pending' }

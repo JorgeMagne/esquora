@@ -7,6 +7,7 @@ import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 import { streamSSE } from 'hono/streaming'
 import { StrKey } from '@stellar/stellar-sdk'
 import { canOpenConditionDispute } from '../shared/conditions.ts'
+import { projectRequirements, startEvidence, type ReservationRecord } from '../shared/reservation.ts'
 import {
   changeResolutionInstruction, getResolutionInstruction, isResolutionReady, readResolutionCase, submitResolutionInstruction,
 } from './resolutions.ts'
@@ -267,7 +268,9 @@ function canReadFile(u: UserRow, fileId: string) {
        AND (o.contract_file_id = ?2
          OR EXISTS (SELECT 1 FROM tranches t JOIN evidence e ON e.tranche_id = t.id WHERE t.op_id = o.id AND e.file_id = ?2)
          OR EXISTS (SELECT 1 FROM tranches t JOIN resolution_instructions r ON r.tranche_id = t.id WHERE t.op_id = o.id AND r.file_id = ?2)
-         OR EXISTS (SELECT 1 FROM project_docs d WHERE d.project_id = o.project_id AND d.file_id = ?2))`,
+         OR EXISTS (SELECT 1 FROM json_each(o.terms_json, '$.reserva.documents') d WHERE json_extract(d.value, '$.fileId') = ?2)
+         OR (json_extract(o.terms_json, '$.reserva') IS NULL AND EXISTS (
+           SELECT 1 FROM project_docs d WHERE d.project_id = o.project_id AND d.file_id = ?2)))`,
     u.id,
     fileId,
   )
@@ -381,6 +384,9 @@ app.post('/api/projects/:id/docs', auth, async (c) => {
   const file = get<any>('SELECT id FROM files WHERE id = ? AND uploaded_by = ?', str(b.fileId, 80), u.id)
   if (!file) throw new HttpError(400, 'Vuelve a subir el documento.')
   inTransaction(() => {
+    if (b.onlyIfMissing && get('SELECT id FROM project_docs WHERE project_id = ? AND req_key = ?', p.id, reqKey)) {
+      throw new HttpError(409, 'El expediente cambió. Revisa la versión del proyecto.')
+    }
     run('DELETE FROM project_docs WHERE project_id = ? AND req_key = ?', p.id, reqKey)
     run('INSERT INTO project_docs (id, project_id, req_key, file_id, created_at) VALUES (?,?,?,?,?)',
       newId('doc'), p.id, reqKey, file.id, now())
@@ -500,14 +506,33 @@ app.post('/api/ops', auth, async (c) => {
     'SELECT id, sha256 FROM files WHERE id = ? AND uploaded_by = ?', contractId, u.id,
   ) : null
   if (contractId && !contract) throw new HttpError(400, 'Vuelve a adjuntar el contrato.')
+  let requestedTranches = b.tranches
+  let reservation: ReservationRecord | undefined
+  if (b.agreementKind === 'reservation') {
+    if (!contract || b.reviewed !== true) throw new HttpError(400, 'Adjunta el contrato certificado y confirma la revisión del expediente.')
+    const professional = requireStr(b.professional, 'profesional que firmará el acta', 160)
+    const documents = projectRequirements.map(({ key, label }) => {
+      const file = get<{ id: string; sha256: string }>(
+        'SELECT f.id, f.sha256 FROM project_docs d JOIN files f ON f.id = d.file_id WHERE d.project_id = ? AND d.req_key = ?',
+        project.id, key,
+      )
+      if (!file || b.projectFiles?.[key] !== file.id) throw new HttpError(409, 'Revisa el expediente del proyecto. Falta o cambió el documento: ' + label)
+      return { key, label, fileId: file.id, sha256: file.sha256 }
+    })
+    reservation = { reviewedBy: u.name || u.email!, reviewedAt: now(), professional, documents }
+    requestedTranches = [{
+      title: 'Inicio de obra', condition: requireStr(b.startCondition, 'trabajo que acredita el inicio', 600),
+      requirements: [startEvidence], amount: deposit, dueAt: b.startDeadline,
+    }]
+  }
   const requestedHours = b.refundResponseHours
   const hours = typeof requestedHours === 'number' && Number.isFinite(requestedHours) && requestedHours >= 1 / 60
     ? Math.min(Math.round(requestedHours * 60) / 60, 24 * 60)
     : 72
 
-  if (!Array.isArray(b.tranches) || b.tranches.length < 1 || b.tranches.length > 7)
+  if (!Array.isArray(requestedTranches) || requestedTranches.length < 1 || requestedTranches.length > 7)
     throw new HttpError(400, 'Define entre uno y siete tramos.')
-  const tranches = b.tranches.map((t: any, i: number) => {
+  const tranches = requestedTranches.map((t: any, i: number) => {
     if (!t || typeof t !== 'object') throw new HttpError(400, 'Los datos de la condición no son válidos.')
     const dueAt = new Date(str(t.dueAt, 40))
     if (Number.isNaN(dueAt.getTime())) throw new HttpError(400, `Falta la fecha límite del tramo ${i + 1}.`)
@@ -546,6 +571,7 @@ app.post('/api/ops', auth, async (c) => {
     arbiterEmail: resolver.email,
     resolutionMode: resolver.mode,
     contractSha256: contract?.sha256 ?? null,
+    reservation,
     tranches,
   })
   const id = newId('op')
@@ -734,19 +760,43 @@ app.post('/api/ops/:id/decline', auth, async (c) => {
   })
 })
 
+function reservationFundingDeadline(op: OpRow) {
+  if (!JSON.parse(op.terms_json).reserva) return Infinity
+  const deadline = Date.parse(tranchesOf(op.id)[0].due_at)
+  if (Date.now() >= deadline) throw new HttpError(409, 'Venció el plazo de esta reserva.')
+  return deadline
+}
+
+function checkUnitAvailable(op: OpRow) {
+  const conflict = get(
+    `SELECT o.id FROM operations o
+       WHERE o.project_id = ? AND lower(trim(o.unit)) = lower(trim(?)) AND o.id != ?
+       AND (json_extract(o.terms_json, '$.reserva') IS NOT NULL OR ?)
+       AND (o.status = 'funded'
+         OR EXISTS (SELECT 1 FROM deposits d WHERE d.op_id = o.id AND d.status IN ('queued','paid'))
+         OR (o.status = 'closed' AND EXISTS (
+           SELECT 1 FROM tranches t WHERE t.op_id = o.id AND t.to_seller > 0 AND t.due_at > ?)))
+       LIMIT 1`, op.project_id, op.unit, op.id, JSON.parse(op.terms_json).reserva ? 1 : 0, now(),
+  )
+  if (conflict) throw new HttpError(409, 'Esta unidad ya tiene una reserva con fondos comprometidos.')
+}
+
 app.post('/api/ops/:id/deposit', auth, (c) => {
   const u = c.get('user')
   const { op, role } = loadOp(u, c.req.param('id') ?? '')
   if (role !== 'buyer' || op.status !== 'awaiting_deposit') throw new HttpError(409, 'Esta operación no espera un depósito.')
   const existing = currentDepositOrder(op.id)
-  if (existing && (existing.status === 'queued' || existing.status === 'paid' || Date.parse(existing.expires_at) > Date.now())) {
+  if (existing && (existing.status === 'queued' || existing.status === 'paid')) return c.json(serializeOrder(existing))
+  const deadline = reservationFundingDeadline(op)
+  checkUnitAvailable(op)
+  if (existing && Date.parse(existing.expires_at) > Date.now()) {
     return c.json(serializeOrder(existing))
   }
   const id = newId('dep')
   run(
     "INSERT INTO deposits (id, op_id, user_id, amount, rate, amount_bob, reference, status, expires_at, created_at) VALUES (?,?,?,?,?,?,?,'pending',?,?)",
     id, op.id, u.id, op.deposit, BOB_PER_USDC, Math.round(op.deposit * BOB_PER_USDC),
-    op.code + '-' + shortCode(4), new Date(Date.now() + 20 * 60_000).toISOString(), now(),
+    op.code + '-' + shortCode(4), new Date(Math.min(deadline, Date.now() + 20 * 60_000)).toISOString(), now(),
   )
   return c.json(serializeOrder(get<DepositRow>('SELECT * FROM deposits WHERE id = ?', id)!))
 })
@@ -780,6 +830,8 @@ app.post('/api/anchor/orders/:id/pay', auth, (c) => {
     if (Date.parse(current.expires_at) <= Date.now()) throw new HttpError(410, 'La cotización venció. Vuelve a ESQUORA para generar un nuevo pago.')
     const op = opById(current.op_id)!
     if (op.status !== 'awaiting_deposit' || !op.escrow_contract_id) throw new HttpError(409, 'Esta operación ya no espera un depósito.')
+    reservationFundingDeadline(op)
+    checkUnitAvailable(op)
     if ((op.held_on_chain ?? 0) > 0) throw new HttpError(409, 'Ya hay un depósito parcial en la red. Revisa la operación antes de continuar.')
     const processing = get("SELECT 1 FROM deposits WHERE op_id = ? AND status IN ('queued','paid','settled') LIMIT 1", op.id)
     if (processing) throw new HttpError(409, 'Ya hay un pago para esta operación.')
@@ -945,6 +997,9 @@ async function armTranche(u: UserRow, id: string, kind: TrancheAction, b: Record
         toSeller = sellerShare
       }
       if (op.resolution_mode !== 'esquora') data = { note: str(b.note, 1000) || undefined }
+      if (JSON.parse(op.terms_json).reserva && toSeller > 0 && !t.evidence_at) {
+        throw new HttpError(409, 'Sin acta presentada no corresponde un pago al desarrollador.')
+      }
     }
     const xdr = await buildMilestoneAction({
       kind: kind === 'refund' ? 'dispute' : kind, contractId: op.escrow_contract_id, index: t.idx,

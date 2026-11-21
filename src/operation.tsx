@@ -63,6 +63,8 @@ function DepositReview({ operation }: { operation: Operation }) {
   const task = useWork()
   const navigate = useNavigate()
   const pending = depositOrder && depositInProgress(depositOrder.status)
+  const reservationDeadline = operation.reservation ? operation.tranches[0].dueAt : null
+  const expired = reservationDeadline && Date.parse(reservationDeadline) <= Date.now()
   const paymentUrl = (orderId: string) => paymentPath(orderId) + '?operacion=' + encodeURIComponent(id)
 
   return <div className="deposit-review">
@@ -73,9 +75,15 @@ function DepositReview({ operation }: { operation: Operation }) {
       <p>{pending
         ? 'El saldo aparecerá como protegido cuando se confirme en la red.'
         : 'Revisa cuánto pagarías en bolivianos. El depósito confirmado queda protegido por las condiciones del acuerdo.'}</p>
-      <Feedback error={task.error} />
+      {reservationDeadline && <dl className="details">
+        <div><dt>Unidad reservada al depositar</dt><dd>{unit}</dd></div>
+        <div><dt>Precio acordado</dt><dd>{money(operation.price)}</dd></div>
+        <div><dt>Trabajo que autoriza el cobro</dt><dd>{operation.tranches[0].condition}</dd></div>
+        <div><dt>Plazo de acreditación</dt><dd>{formatDate(reservationDeadline, true)}</dd></div>
+      </dl>}
+      <Feedback error={task.error || (expired && !pending ? 'Venció el plazo de esta reserva.' : null)} />
       {pending ? <ActionLink to={paymentUrl(depositOrder.id)}>Consultar depósito</ActionLink> :
-        <button className="button primary" type="button" disabled={task.busy} onClick={() => void task.run(async () => {
+        <button className="button primary" type="button" disabled={task.busy || !!expired} onClick={() => void task.run(async () => {
           const order = await write<DepositOrder>('/ops/' + id + '/deposit')
           navigate(paymentUrl(order.id))
         })}>{task.busy ? 'Preparando cotización…' : 'Ver cotización'}<ArrowRight size={18} aria-hidden="true" /></button>}
@@ -250,7 +258,13 @@ function Agreement({ operation, fromOperation = false }: { operation: Operation;
               Math.round(operation.refundResponseHours * 60) + ' min' : operation.refundResponseHours + ' h'}</dd></div>
           </dl>
           {contract && <FileRow file={contract} label="Descargar el contrato" detail={contract.name} />}
+          {operation.reservation && <p>Al confirmarse el depósito, el desarrollador apartará la unidad {operation.unit} al precio acordado hasta el plazo de acreditación.</p>}
         </section>
+        {operation.reservation && <section className="section">
+          <h2>Documentos de la reserva</h2>
+          <p className="muted">Revisión declarada por {operation.reservation.reviewedBy} · {formatDate(operation.reservation.reviewedAt)}</p>
+          {operation.reservation.documents.map(({ label, file }) => file && <FileRow key={label} label={label} file={file} detail={file.name} />)}
+        </section>}
         {sellerDraft && <DraftResolver
           key={resolverKey}
           operation={operation} mode={resolutionMode} ready={resolverReady}
@@ -266,11 +280,12 @@ function Agreement({ operation, fromOperation = false }: { operation: Operation;
           <ol className="plain-list resolution-clauses">{resolutionTerms.clauses.map((clause, index) => <li key={index}>{clause}</li>)}</ol>
         </section>}
         <section className="section">
-          <h2>Condiciones</h2>
-          {tranches.map((tranche) => <details className="disclosure" key={tranche.id}>
+          <h2>{operation.reservation ? 'Condición de cobro' : 'Condiciones'}</h2>
+          {tranches.map((tranche) => <details className="disclosure" key={tranche.id} open={operation.reservation ? true : undefined}>
             <summary><span>{tranche.title}</span><b>{money(tranche.amount)}</b></summary>
             <p>{tranche.condition}</p><p className="muted">Hasta el {formatDate(tranche.dueAt, true)} (Bolivia)</p>
             <ul className="plain-list">{tranche.requirements.map((requirement) => <li key={requirement.key}>{requirement.label}</li>)}</ul>
+            {operation.reservation && <p>Profesional firmante: {operation.reservation.professional}</p>}
           </details>)}
         </section>
       </div>
@@ -279,8 +294,9 @@ function Agreement({ operation, fromOperation = false }: { operation: Operation;
         <Amount cents={deposit} />
         <dl className="details">
           <div><dt>Comisión de ESQUORA</dt><dd>{percent.format(operation.feeBps / 10_000)}</dd></div>
-          <div><dt>Comisión de la red de protección</dt><dd>{percent.format(TW_FEE_BPS / 10_000)}</dd></div>
+          <div><dt>Comisión de Trustless Work</dt><dd>{percent.format(TW_FEE_BPS / 10_000)}</dd></div>
           <div><dt>Comisiones estimadas</dt><dd>{money(fees)}</dd></div>
+          {operation.reservation && <div><dt>Neto al cobrar o devolver la inicial</dt><dd>{money(deposit - fees)}</dd></div>}
         </dl>
         <p className="muted">Las comisiones se descuentan cuando se entrega o se devuelve cada tramo.</p>
         <Feedback error={(!canSend && task.error) || (operation.deploymentError ? 'No pudimos registrar la protección. Vuelve a confirmar el acuerdo.' : null)}>
@@ -401,7 +417,7 @@ function ConditionDetail({ operation, tranche }: { operation: Operation; tranche
   const [submitted, setSubmitted] = useState('')
   const state = conditionState(tranche)
   const gross = tranche.amount
-  const agreedRefund = tranche.refundResponse === 'accepted'
+  const agreedRefund = tranche.refundResponse === 'accepted' || (!!operation.reservation && !tranche.evidenceAt)
   let buyerShare: number | null = agreedRefund ? gross : null
   if (!agreedRefund && toBuyer.trim()) {
     try {
@@ -437,7 +453,8 @@ function ConditionDetail({ operation, tranche }: { operation: Operation; tranche
     <div className="two-column">
       <div>
         <section className="section">
-          <h2>Documentos de la condición</h2>
+          <h2>{operation.reservation ? 'Acta de inicio de obra' : 'Documentos de la condición'}</h2>
+          {operation.reservation && <p>El acta debe identificar el predio, el bloque, el trabajo realizado y la fecha de inicio. Firma acordada: {operation.reservation.professional}.</p>}
           <p>{tranche.condition}</p>
           {tranche.requirements.map((requirement) => {
             const file = tranche.evidence.find((item) => item.reqKey === requirement.key)?.file
@@ -582,7 +599,7 @@ function EvidenceForm({ operation, tranche, locked, feedback, onReady }: {
     (key === 'contrato_certificado' && operation.contract ? { file: operation.contract, reqKey: key } : undefined)
 
   return <section className="section">
-    <h2>Presentar documentos</h2>
+    <h2>{operation.reservation ? 'Presentar el acta firmada' : 'Presentar documentos'}</h2>
     <form className="stack" onSubmit={task.submit(async (data) => {
       if (locked) return
       const items: { reqKey: string; fileId: string }[] = []

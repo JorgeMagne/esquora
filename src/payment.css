@@ -1,6 +1,5 @@
 .payment-sheet {
-  --bank-ink: #273a50;
-  --bank-active: #152435;
+  --bank-ink: #263d54;
   width: min(100%, 900px);
   margin-inline: auto;
 }
@@ -78,6 +77,81 @@
   color: var(--bank-ink);
 }
 
+.payment-secured .payment-amount .amount { color: var(--blue); }
+.deposit-protected-word { color: var(--blue); }
+.payment-layout:has(.vault-flight) .vault-on-plan { visibility: hidden; }
+.vault-flight {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  overflow: clip;
+  color: var(--bank-ink);
+}
+.vault-veil {
+  position: absolute;
+  inset: 0;
+  background-color: color-mix(in srgb, var(--paper) 96%, transparent);
+  background-image: radial-gradient(color-mix(in srgb, var(--muted) 15%, transparent) .65px, transparent .85px);
+  background-size: 16px 16px;
+  animation: vault-paper 3580ms both;
+}
+.vault-detail {
+  width: var(--vault-width);
+  height: auto;
+  overflow: visible;
+  transform-origin: center;
+  animation: vault-trip 3580ms both;
+}
+.vault-detail .vault-leaf { transform-origin: 102px 114px; animation: vault-open 2360ms both; }
+.vault-bill { transform-origin: 135px 116px; animation: vault-banknote 810ms 830ms both; }
+.bill-1 { animation-delay: 1030ms; }
+.bill-2 { animation-delay: 1240ms; }
+.vault-detail .vault-dial { transform-origin: 132px 114.5px; animation: vault-turn 440ms 2270ms ease-out both; }
+.vault-detail .vault-ink-check { stroke-dasharray: 1; animation: vault-sign 350ms 2510ms both; }
+.vault-measure { animation: vault-paper 3580ms both; opacity: .6; }
+.vault-caption {
+  position: absolute;
+  top: calc(50% + var(--vault-width) * .29);
+  margin: 0;
+  font-size: clamp(1.12rem, 2.6vw, 1.6rem);
+  letter-spacing: -.025em;
+  color: var(--ink);
+  animation: vault-caption 3580ms both;
+}
+.vault-caption strong { color: var(--blue); }
+
+@keyframes vault-trip {
+  0%, 100% { transform: translate(var(--vault-x), var(--vault-y)) scale(var(--vault-scale)); }
+  0%, 82% { animation-timing-function: cubic-bezier(.35,0,.18,1); }
+  19%, 82% { transform: none; }
+}
+@keyframes vault-paper { 0%,100% { opacity: 0; } 17%,83% { opacity: 1; } }
+@keyframes vault-open {
+  0%,22% { transform: none; }
+  37%,85% { transform: skewY(13deg) scaleX(-.44); }
+  100% { transform: none; }
+}
+@keyframes vault-banknote {
+  0% { opacity: 0; transform: translate(110px,19px) rotate(11deg) scale(1.06); }
+  20% { opacity: 1; }
+  54% { transform: translate(49px,-2px) rotate(-6deg); }
+  88% { opacity: 1; }
+  100% { opacity: 0; transform: translate(4px,4px) rotate(1deg) scale(.67,.52); }
+}
+@keyframes vault-turn { from { transform: rotate(-100deg); } to { transform: none; } }
+@keyframes vault-sign { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes vault-caption {
+  0%,62%,100% { opacity: 0; transform: translateY(4px); }
+  72%,84% { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .vault-flight { display: none; }
+  .payment-layout:has(.vault-flight) .vault-on-plan { visibility: visible; }
+}
+
 .payment-review {
   grid-area: review;
   min-width: 0;
@@ -105,13 +179,7 @@
 }
 
 .payment-actions > .button.primary {
-  background: var(--bank-ink);
-  border-color: var(--bank-ink);
   width: 100%;
-}
-
-.payment-actions > .button.primary:hover:not(:disabled) {
-  background: var(--bank-active);
 }
 
 .payment-actions .external-link {

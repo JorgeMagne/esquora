@@ -3,19 +3,22 @@ name: "ESQUORA"
 description: "Plano de ventas para operaciones de preventa con dinero protegido."
 colors:
   papel: "#F4F5F2"
-  papel-secundario: "#E9EBE7"
-  tinta: "#10151C"
-  texto-secundario: "#505B68"
-  linea: "#D9DDE0"
-  linea-control: "#8D969F"
-  ultramar: "#2038D0"
-  ultramar-activo: "#1629AA"
-  ultramar-claro: "#E6E9FB"
+  papel-secundario: "#E8EDF0"
+  tinta: "#19232D"
+  texto-secundario: "#4D5C69"
+  linea: "#D2DBE1"
+  linea-control: "#718292"
+  cobalto: "#3067CC"
+  cobalto-activo: "#234FA3"
+  cobalto-claro: "#E4EDFC"
+  texto-sobre-tinta: "#C4D0DA"
+  foco-sobre-tinta: "#A6C6FF"
+  tinta-activa: "#2A3D51"
   blanco: "#FFFFFF"
-  error: "#8B2025"
-  papel-error: "#F7EBEA"
-  banco: "#273A50"
-  papel-banco: "#EFF1F4"
+  error: "#892837"
+  papel-error: "#FAEBEC"
+  banco: "#263D54"
+  papel-banco: "#EAF0F5"
 typography:
   display:
     fontFamily: "Sofia Sans, system-ui, sans-serif"
@@ -54,16 +57,17 @@ spacing:
   seccion: "28px"
 components:
   boton-principal:
-    backgroundColor: "{colors.ultramar}"
-    textColor: "{colors.blanco}"
+    backgroundColor: "{colors.tinta}"
+    textColor: "{colors.papel}"
     rounded: "{rounded.recto}"
     height: "48px"
     padding: "11px 16px"
   boton-principal-hover:
-    backgroundColor: "{colors.ultramar-activo}"
+    backgroundColor: "{colors.tinta-activa}"
   boton-secundario:
     backgroundColor: "{colors.papel}"
     textColor: "{colors.tinta}"
+    borderColor: "{colors.tinta}"
     rounded: "{rounded.recto}"
     height: "48px"
     padding: "11px 16px"
@@ -86,14 +90,14 @@ components:
 
 **Plano de ventas.** La unidad del comprador vive en un corte esquemático del edificio. El dibujo y la condición actual explican el estado de la preventa antes de que el comprador lea el expediente.
 
-La aplicación se lee como un plano en papel claro. Una línea fina separa cada grupo, la tinta oscura gobierna la lectura y el ultramar señala la acción disponible y el dinero que sigue protegido. La maqueta aprobada define la composición móvil de «Mi compra». La web extiende sus reglas a proyectos, acuerdos, casos y comprobantes. [Maqueta aprobada](diseno/maquetas/compra.html) · [Estilos](src/styles.css)
+La aplicación se lee como un plano en papel claro. Una línea fina separa cada grupo, la tinta oscura gobierna la lectura y las acciones, y el cobalto señala el dinero que sigue protegido. La maqueta aprobada define la composición móvil de «Mi compra». La web extiende sus reglas a proyectos, acuerdos, casos y comprobantes. [Maqueta aprobada](diseno/maquetas/compra.html) · [Estilos](src/styles.css)
 
 ## Colors
 
-- **Papel y tinta.** El fondo papel es continuo. Los bordes de un píxel separan filas, formularios y secciones. Los datos secundarios usan una tinta más suave.
-- **Ultramar.** Marca la unidad en el plano, el dinero protegido, la acción principal y el foco por teclado. El ultramar más profundo identifica la interacción con el botón.
+- **Papel y tinta.** El contenido usa papel claro. El encabezado usa tinta oscura con el logotipo en blanco cálido y la Q a 30°. El favicon toma el símbolo a un color sobre el mismo fondo. [Logotipo](public/esquora-logo.svg) · [Favicon](public/favicon.svg)
+- **Cobalto.** Marca la unidad en el plano, el dinero protegido, los enlaces y el foco por teclado sobre papel. Los controles del encabezado usan azul claro para el foco y la selección sobre tinta.
 - **Estados.** Azul sólido para lo protegido, tinta sólida para lo entregado, rayado para lo devuelto y línea discontinua para lo pendiente de depósito. Cada estado también se escribe.
-- **Pasarela.** Papel gris azulado y botón de banco. El rótulo de prueba permanece visible en la página de pago.
+- **Pasarela.** Papel gris azulado y acciones en tinta. El rótulo de prueba permanece visible en la página de pago.
 
 ## Typography
 
@@ -111,11 +115,11 @@ La profundidad proviene de la jerarquía tipográfica, los bordes y el contraste
 
 ## Shapes
 
-Contornos rectos, controles cuadrados y líneas delgadas. El avatar circular distingue el acceso a la cuenta. El corte de la torre se dibuja con vectores geométricos y señala la unidad en ultramar.
+Contornos rectos, controles cuadrados y líneas delgadas. El avatar circular distingue el acceso a la cuenta. El corte de la torre se dibuja con vectores geométricos y señala la unidad en cobalto.
 
 ## Components
 
-- **Acción principal.** Botón ultramar con etiqueta de verbo, flecha y 48 px de altura mínima. En el pie contextual mide 54 px. El estado ocupado conserva el texto de la acción y anuncia el progreso.
+- **Acción principal.** Botón en el mismo tono de tinta que el fondo del logotipo, con etiqueta de verbo, flecha y 48 px de altura mínima. En el pie contextual mide 54 px. El estado ocupado conserva el texto de la acción y anuncia el progreso. Las acciones secundarias usan borde y texto en tinta sobre papel.
 - **Campo.** Borde visible, etiqueta persistente y al menos 48 px de altura. Se indica el horario de Bolivia en los plazos y se admiten centavos.
 - **Condiciones.** La barra representa el importe relativo de cada condición. La lista permite abrir cada expediente y muestra su estado y monto. En un tramo entregado o devuelto, la fila muestra el importe neto registrado. Si hubo un reparto, se muestran ambos importes netos.
 - **Corte de torre.** La silueta y el marcador azul se mantienen estables. Con la documentación confirmada, se consolida la base del plano. Al confirmarse el inicio, se consolidan la cuadrícula y las divisiones. Una devolución mantiene el nivel anterior. La posición del marcador es esquemática.

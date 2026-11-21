@@ -2,6 +2,7 @@
 
 import { createHash } from 'node:crypto'
 import { netAfterFees } from '../shared/fees.ts'
+import type { ReservationRecord } from '../shared/reservation.ts'
 import { ESQUORA_RESOLUTION_TERMS } from '../shared/resolution-terms.ts'
 import { APP_URL, TW_FEE_BPS } from './config.ts'
 import { all, get, now, run } from './db.ts'
@@ -248,6 +249,7 @@ export const feeFor = (op: OpRow, grossCents: number) => grossCents - netAfterFe
 // ───────────────────────── Acuerdo ─────────────────────────
 
 export function buildTerms(input: {
+  reservation?: ReservationRecord
   code: string
   project: { name: string; city: string; address: string }
   unit: string
@@ -280,6 +282,10 @@ export function buildTerms(input: {
     desarrollador: { nombre: input.seller.org_name ?? input.seller.name, cuenta: input.seller.public_key },
     comprador: { nombre: input.buyer.name, correo: input.buyer.email },
     contratoSha256: input.contractSha256,
+    ...(input.reservation && {
+      reserva: input.reservation,
+      compromisoDeReserva: 'Al confirmarse el depósito, el desarrollador aparta la unidad al precio acordado hasta el vencimiento del plazo de acreditación.',
+    }),
     plazoRespuestaDevolucionHoras: input.refundResponseHours,
     tramos: input.tranches.map((t, i) => ({
       numero: i + 1,
@@ -420,6 +426,7 @@ export function serializeOp(op: OpRow, viewer: UserRow) {
     op.id,
   )
   const order = role === 'buyer' ? currentDepositOrder(op.id) : null
+  const reservation: ReservationRecord | undefined = JSON.parse(op.terms_json).reserva
 
   return {
     id: op.id,
@@ -444,6 +451,9 @@ export function serializeOp(op: OpRow, viewer: UserRow) {
     resolverReady: arbiter?.wallet_status === 'active',
     resolutionTerms: op.resolution_mode === 'esquora' ? JSON.parse(op.terms_json).resolucionEsquora : null,
     contract: op.contract_file_id ? fileMeta(op.contract_file_id) : null,
+    reservation: reservation ? {
+      ...reservation, documents: reservation.documents.map(doc => ({ label: doc.label, file: fileMeta(doc.fileId) })),
+    } : null,
     contractSha256: op.contract_sha256,
     terms: op.terms_json,
     termsDigest: op.terms_digest,

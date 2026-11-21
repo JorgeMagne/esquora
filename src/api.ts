@@ -21,7 +21,7 @@ export type Armed = Partial<Receipt> & { id?: string; xdr?: string; expiresAt?: 
 export type ActionInput = { kind: ActionKind; trancheId?: string; opId?: string; items?: { reqKey: string; fileId: string }[]; note?: string; reason?: string; toBuyer?: number; toSeller?: number; amount?: number; bank?: string; account?: string; holder?: string; ledger?: boolean; instructionId?: string }
 export type Tranche = TrancheSummary & {
   id: string; condition: string; requirements: Requirement[]; feeEstimate: number; evidence: Evidence[];
-  evidenceNote: string | null; objection: string | null; refundRequestedAt: string | null; refundWindowPassed: boolean;
+  evidenceAt: string | null; evidenceNote: string | null; objection: string | null; refundRequestedAt: string | null; refundWindowPassed: boolean;
   evidenceHistory?: { txHash: string | null; at: string; files: Evidence[] }[];
   refundResponse?: 'accepted' | 'rejected' | null; refundResponseDueAt?: string | null; refundResponseReason?: string | null;
   disputeReason: string | null; disputeByRole: Role | null; txHash: string | null; toBuyer: number | null; toSeller: number | null;
@@ -34,6 +34,7 @@ export type OperationSummary = {
   todo: string | null; tranches: TrancheSummary[]; createdAt: string;
 }
 export type Operation = Omit<OperationSummary, 'tranches'> & {
+  reservation?: { reviewedBy: string; reviewedAt: string; professional: string; documents: { label: string; file: FileInfo | null }[] } | null
   feeBps: number; refundResponseHours: number; seller: Party; buyer: Party | null; buyerEmail: string;
   resolutionMode: ResolutionMode; arbiter: Party | null; arbiterEmail: string | null; arbiterInviteToken: string | null;
   resolverReady: boolean; resolutionTerms: ResolutionTerms | null;

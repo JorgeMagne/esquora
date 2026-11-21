@@ -41,7 +41,7 @@ export function ResolutionInstruction({ operation, tranche, locked, onReady }: {
   const { role } = operation
   const editable = operation.status === 'funded' && !locked && (tranche.status === 'disputed' ||
     (tranche.status === 'refund_requested' && (!!tranche.refundResponse || tranche.refundWindowPassed)))
-  const agreedRefund = tranche.refundResponse === 'accepted'
+  const agreedRefund = tranche.refundResponse === 'accepted' || (!!operation.reservation && !tranche.evidenceAt)
   const instruction = current.data?.instruction
   const attested = !!instruction && attestedId === instruction.id
   const signed = role === 'buyer' ? instruction?.buyerSigned : instruction?.sellerSigned
@@ -76,7 +76,7 @@ export function ResolutionInstruction({ operation, tranche, locked, onReady }: {
             <option value="mutual">Acuerdo entre comprador y desarrollador</option>
             <option value="external">Resolución de una instancia externa</option>
           </select></Field>
-          {agreedRefund ? <p>Devolución acordada antes de comisiones · <strong>{money(tranche.amount)}</strong></p> :
+          {agreedRefund ? <p>Importe a devolver antes de comisiones · <strong>{money(tranche.amount)}</strong></p> :
             <Field label="Importe para el comprador (USD)" help="El resto corresponde al desarrollador. Escribe 0 si recibe todo el desarrollador.">
               <input name="buyerShare" inputMode="decimal" required />
             </Field>}

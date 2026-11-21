@@ -12,7 +12,7 @@ El inicio prepara las cuentas de servicio de Testnet y comprueba su saldo. SQLit
 
 ## Acuerdos y resolución
 
-Un borrador admite de uno a siete tramos editables y un contrato adjunto opcional. Los tramos reparten un único depósito. Para firmar el acuerdo, las partes deben tener una modalidad de resolución confirmada. La invitación a un tercero externo se comparte por enlace y solo se puede aceptar desde el correo indicado, con una cuenta de tercero activa.
+La reserva exige expediente y contrato certificado y protege la inicial completa hasta el inicio de obra. El acuerdo personalizado admite de uno a siete tramos editables y un contrato adjunto opcional. Los tramos reparten un único depósito. Para firmar, las partes deben tener una modalidad de resolución confirmada. La invitación a un tercero externo se comparte por enlace y solo se puede aceptar desde el correo indicado, con una cuenta de tercero activa.
 
 Al migrar una base de datos anterior, ESQUORA guarda primero una copia de SQLite en `DATA_DIR` y comprueba las referencias dentro de la transacción de migración.
 
@@ -27,7 +27,13 @@ El mandato es para el entorno de pruebas. Para dinero real se debe validar la do
 - `npm run build` compila el sitio.
 - `npm run e2e` ejecuta el recorrido real cuando `ESQUORA_RUN_TESTNET_E2E=1`. Crea cuentas y saldo de prueba, usa un servidor efímero enlazado a loopback y consulta los comprobantes de Stellar. El acceso de prueba solo se habilita en loopback con un token explícito y queda deshabilitado con `NODE_ENV=production`.
 
-El ensayo interactivo usa tres perfiles de navegador con tres correos diferentes en Pollar. Activa primero al tercero designado, luego al desarrollador y al comprador. Crea un proyecto y una operación ficticia con dos condiciones y comparte la invitación con el correo exacto del comprador. Deposita en la pasarela de pruebas, comprueba la protección, presenta y confirma la primera condición y cobra desde la cuenta del desarrollador. Cuando venza la segunda, pide la devolución desde la cuenta del comprador, acéptala como desarrollador y ejecútala como tercero. Comprueba los tres saldos y los comprobantes. Mantén visible el rótulo de Testnet en la grabación.
+La opción inicial de **Nueva operación** es **Reserva hasta el inicio de obra**. El desarrollador indica el trabajo acordado, el plazo y quién firmará el acta. Revisa los documentos del proyecto y adjunta el contrato certificado de la unidad. El comprador recibe esa versión del expediente al abrir la invitación. Los acuerdos con condiciones personalizadas se crean desde el mismo formulario.
+
+Para ensayar los dos desenlaces, abre tres perfiles con correos distintos en Pollar (desarrollador, comprador y tercero). Crea dos reservas de proyectos diferentes, acepta las designaciones, firma los acuerdos y fondea ambos antes de sus plazos. En el primer proyecto presenta el acta, apruébala como comprador y cobra como desarrollador. Para el segundo puedes dejar preparada una reserva fondeada cuyo plazo ya haya vencido cuando comience la presentación. Solicita la devolución, registra la respuesta y ejecuta la resolución desde la cuenta del tercero. El detalle de la operación permite abrir los comprobantes en Stellar Testnet.
+
+Con `ESQUORA_RUN_TESTNET_E2E=1`, `npm run e2e -- --reserva` comprueba ambos desenlaces con fondos de prueba y firmas de cuentas locales. El acceso interactivo con Pollar se comprueba desde el navegador.
+
+Comprobantes del ensayo de dos reservas en Testnet (200 USDC de prueba por operación, 197,60 netos en cada salida): [depósito de la operación cobrada](https://stellar.expert/explorer/testnet/tx/9bf70b58008be568dcd6a7b5f14f5bba020f9362bbdf6b0bf93d511684689aa7) · [cobro](https://stellar.expert/explorer/testnet/tx/95fd64ec25e11e4c65b3be195fa08df4d744a03aee49ad27519bdd170c0f7b93) · [depósito de la operación devuelta](https://stellar.expert/explorer/testnet/tx/440921cb07668e343614f40f1e35bf420f4be27b5ccd985c412c112b9a0e1fd0) · [devolución](https://stellar.expert/explorer/testnet/tx/6a77605c857e54fcd80a8f25d2025ab2ff9d4e29ce96d72a6cb74e172080e17a).
 
 ## Despliegue HTTPS
 

@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { Asset, Horizon, Keypair, Networks, Operation, Transaction, TransactionBuilder } from '@stellar/stellar-sdk'
+import { projectRequirements } from '../shared/reservation.ts'
 
 type Role = 'buyer' | 'developer' | 'arbiter'
 type SignedAction = { id: string; xdr: string; expiresAt: number | string | null }
@@ -204,6 +205,65 @@ async function run(base: string, token: string, restart?: () => Promise<void>) {
   const developer = await newActor('developer')
   const buyer = await newActor('buyer')
   const arbiter = await newActor('arbiter')
+  if (process.argv.includes('--reserva')) {
+    for (const outcome of ['release', 'refund'] as const) {
+      const development = await api.json<{ id: string }>('/api/projects', {
+        cookie: developer.cookie, data: { name: 'Reserva ' + outcome + ' ' + runId, city: 'Santa Cruz', address: 'Predio de prueba' },
+      })
+      const projectFiles: Record<string, string> = {}
+      for (const { key, label } of projectRequirements) {
+        const file = await upload(developer, key + '.txt', label + ' — documento ficticio')
+        await api.json('/api/projects/' + development.id + '/docs', { cookie: developer.cookie, data: { reqKey: key, fileId: file.id } })
+        projectFiles[key] = file.id
+      }
+      const contract = await upload(developer, 'preventa.txt', 'Contrato ficticio de la unidad B-2')
+      const draft = await api.json<OperationView & { arbiterInviteToken: string }>('/api/ops', {
+        cookie: developer.cookie, data: {
+          agreementKind: 'reservation', projectId: development.id, projectFiles, reviewed: true, contractFileId: contract.id,
+          professional: 'Profesional de prueba', startCondition: 'Excavación de cimientos del bloque B',
+          startDeadline: new Date(Date.now() + (outcome === 'refund' ? 120_000 : 86_400_000)).toISOString(),
+          unit: 'B-2', price: 8_000_000, deposit: DEPOSIT_CENTS, buyerName: buyer.name, buyerEmail: buyer.email,
+          resolutionMode: 'external', arbiterEmail: arbiter.email,
+        },
+      })
+      const opPath = '/api/ops/' + draft.id
+      const op = (cookie = buyer.cookie) => api.json<OperationView>(opPath, { cookie })
+      await api.json('/api/resolver-invitations/' + draft.arbiterInviteToken + '/claim', { cookie: arbiter.cookie, data: {} })
+      const ready = await op(developer.cookie)
+      const sent = await api.json<OperationView>(opPath + '/send', { cookie: developer.cookie, data: { signature: signatureFor(developer.key, ready.termsDigest) } })
+      await api.json('/api/invitations/' + sent.inviteToken + '/claim', { cookie: buyer.cookie, data: {} })
+      await api.json(opPath + '/accept', { cookie: buyer.cookie, data: { signature: signatureFor(buyer.key, sent.termsDigest) } })
+      await poll('registro de la reserva', op, value => value.status === 'awaiting_deposit')
+      const order = await api.json<PaymentView>(opPath + '/deposit', { cookie: buyer.cookie, data: {} })
+      const orderPath = '/api/anchor/orders/' + order.id
+      await api.json(orderPath + '/pay', { cookie: buyer.cookie, data: {} })
+      const paid = await poll('depósito', () => api.json<PaymentView>(orderPath, { cookie: buyer.cookie }), value => value.status === 'settled')
+      await assertTransaction(paid.txHash, true)
+      const funded = await op()
+      assert.equal(funded.tranches.length, 1)
+      assert.equal(funded.totals.held, DEPOSIT_CENTS)
+      const trancheId = funded.tranches[0].id
+      let settlement: string
+      if (outcome === 'release') {
+        const act = await upload(developer, 'acta.txt', 'Acta ficticia de excavación del bloque B firmada por el profesional de prueba.')
+        await signAction(developer, { kind: 'evidence', trancheId, items: [{ reqKey: 'acta_inicio', fileId: act.id }] })
+        await signAction(buyer, { kind: 'approve', trancheId })
+        settlement = await signAction(developer, { kind: 'release', trancheId })
+      } else {
+        await poll('vencimiento de la reserva', op, value => value.tranches[0].overdue, 150_000)
+        await signAction(buyer, { kind: 'refund', trancheId, reason: 'Venció el plazo sin acta.' })
+        await api.json('/api/tranches/' + trancheId + '/refund-response', { cookie: developer.cookie, data: { decision: 'accepted' } })
+        settlement = await signAction(arbiter, { kind: 'resolve', trancheId, toBuyer: DEPOSIT_CENTS, toSeller: 0, note: 'Devolución acordada' })
+      }
+      const closed = await op()
+      assert.equal(closed.status, 'closed')
+      assert.equal(closed.totals.held, 0)
+      const net = Math.round(DEPOSIT_CENTS * (10_000 - config.feeBps - 30) / 10_000)
+      assert.equal(outcome === 'release' ? closed.totals.released : closed.totals.refunded, net)
+      console.log(outcome, 'depósito:', paid.txHash, 'liquidación:', settlement)
+    }
+    return
+  }
   const project = await api.json<{ id: string }>('/api/projects', {
     cookie: developer.cookie, data: {
       name: `Edificio Curupaú de prueba ${runId}`, city: 'Santa Cruz', address: 'Av. de pruebas 100',

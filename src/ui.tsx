@@ -7,11 +7,7 @@ import { money, numberAmount } from './model.ts'
 
 export function Brand() {
   return <Link className="brand" to="/" aria-label="ESQUORA, inicio">
-    <svg width="21" height="21" viewBox="0 0 21 21" aria-hidden="true">
-      <path d="M1 1h19v19H1zM10.5 1v19M1 10.5h19" fill="none" stroke="currentColor" strokeWidth="1.4" />
-      <path d="M1.7 11.2h8.1v8.1H1.7z" fill="var(--blue)" />
-    </svg>
-    ESQUORA
+    <img src="/esquora-logo.svg" alt="" width={284} height={66} />
   </Link>
 }
 

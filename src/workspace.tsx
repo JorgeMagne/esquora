@@ -7,9 +7,10 @@ import {
   invitationPath, operationPath, projectPath, read, readAccessLost, resolverInvitationPath, uploadFile, useSession, write, type Invitation, type Operation,
   type OperationSummary, type Project, type ProjectDetail, type ResolutionMode, type ResolverInvitation, type User,
 } from './api.ts'
-import { amountInCents, conditions, formatDate, money, operationLabels } from './model.ts'
+import { amountInCents, boliviaDateTime, conditions, formatDate, money, operationLabels } from './model.ts'
+import { projectRequirements } from '../shared/reservation.ts'
 import { AccessPlan } from './plans.tsx'
-import { amountsForDraft, buildDraftConditions, draftAmount, draftRequirement, emptyCondition, MAX_CONDITIONS, MAX_REQUIREMENTS, moveCondition, preventaTemplate, type DraftCondition } from './preventa-draft.ts'
+import { amountsForDraft, buildDraftConditions, draftAmount, draftRequirement, emptyCondition, MAX_CONDITIONS, MAX_REQUIREMENTS, moveCondition, type DraftCondition } from './preventa-draft.ts'
 import { ResolverOptions } from './resolver-options.tsx'
 import { ActionLink, Amount, Back, Empty, Feedback, Field, FileRow, Loading, RowLink, Submit, Title, TotalsStrip, useWork } from './ui.tsx'
 
@@ -181,7 +182,7 @@ export function ProjectPage() {
   if (project.isPending) return <Loading>Abriendo el proyecto…</Loading>
   if (project.isError) return <Feedback error={project.error} onRetry={() => void project.refetch()} />
   const { name, city, address, stats, operations, docs, description, deliveryDate } = project.data
-  const reusable = [...conditions[0].requirements.slice(1), ...conditions[1].requirements]
+  const reusable = [...projectRequirements, ...conditions[1].requirements]
   const path = '/projects/' + id + '/docs'
 
   return <>
@@ -202,7 +203,7 @@ export function ProjectPage() {
       </div>
       <section className="section">
         <h2>Documentos del proyecto</h2>
-        <p className="muted">Podrás reutilizarlos al presentar una condición de este proyecto.</p>
+        <p className="muted">{projectRequirements.filter(req => docs.some(doc => doc.reqKey === req.key)).length} de {projectRequirements.length} documentos previos a la reserva. El acta de inicio se presenta al comenzar la obra.</p>
         {docs.map((doc) => doc.file && <div className="document-line" key={doc.id}>
           <FileRow file={doc.file} label={reusable.find((item) => item.key === doc.reqKey)?.label ?? doc.file.name} detail={doc.file.name} />
           <button className="icon-button" type="button" disabled={task.busy} aria-label={'Quitar ' + doc.file.name} onClick={() => setRemoving(doc.id)}>
@@ -245,10 +246,10 @@ export function OperationNew() {
   const task = useWork()
   const navigate = useNavigate()
   const query = useQueryClient()
-  const [startingPoint, setStartingPoint] = useState<'template' | 'blank'>('template')
-  const [drafts, setDrafts] = useState(() => ({ template: preventaTemplate(), blank: [emptyCondition()] }))
+  const [startingPoint, setStartingPoint] = useState<'reservation' | 'custom'>('reservation')
+  const [drafts, setDrafts] = useState(() => [emptyCondition()])
   const [deposit, setDeposit] = useState('')
-  const [resolutionMode, setResolutionMode] = useState<ResolutionMode>('pending')
+  const [resolutionMode, setResolutionMode] = useState<ResolutionMode>('external')
   const [arbiterEmail, setArbiterEmail] = useState('')
   const nextPath = projectPath(id) + '/nueva-operacion'
 
@@ -261,6 +262,8 @@ export function OperationNew() {
     <ActionLink to={'/cuenta?volver=' + encodeURIComponent(nextPath)}>Activar mi cuenta</ActionLink>
   </>
 
+  const reservation = startingPoint === 'reservation'
+  const projectFile = (key: string) => project.data.docs.find(doc => doc.reqKey === key)?.file
   return <>
     <Back to={projectPath(id)}>Volver al proyecto</Back>
     <Title detail={project.data.name}>Nueva operación</Title>
@@ -268,14 +271,37 @@ export function OperationNew() {
       const initial = amountInCents(deposit)
       const price = amountInCents(String(data.get('price')))
       if (initial > price) throw new Error('La cuota inicial debe ser menor o igual al precio del inmueble.')
-      const tranches = buildDraftConditions(drafts[startingPoint], initial)
+      const tranches = reservation ? undefined : buildDraftConditions(drafts, initial)
+      const startDeadline = reservation ? boliviaDateTime(String(data.get('startDeadline'))) : undefined
+      if (startDeadline && Date.parse(startDeadline) <= Date.now()) throw new Error('La fecha límite de inicio debe ser futura.')
       const contract = data.get('contract')
       if (resolutionMode === 'external' && arbiterEmail.trim().toLowerCase() === String(data.get('buyerEmail')).trim().toLowerCase())
         throw new Error('El comprador y el tercero designado deben usar correos diferentes.')
+      const projectFiles: Record<string, string> = {}
+      if (reservation) {
+        for (const { key, label } of projectRequirements) {
+          const existing = projectFile(key)
+          if (existing) {
+            projectFiles[key] = existing.id
+            continue
+          }
+          const input = data.get(key)
+          if (!(input instanceof File) || !input.size) throw new Error('Adjunta el documento: ' + label)
+          const uploaded = await uploadFile(input)
+          try {
+            await write('/projects/' + id + '/docs', { reqKey: key, fileId: uploaded.id, onlyIfMissing: true })
+          } finally {
+            await query.invalidateQueries({ queryKey: ['/projects/' + id] })
+          }
+          projectFiles[key] = uploaded.id
+        }
+      }
       const file = contract instanceof File && contract.size > 0 ? await uploadFile(contract) : null
       const operation = await write<Operation>('/ops', {
         projectId: id, unit: data.get('unit'), unitDetail: data.get('unitDetail'), price, deposit: initial, buyerName: data.get('buyerName'),
         buyerEmail: data.get('buyerEmail'), resolutionMode,
+        ...(reservation && { agreementKind: 'reservation', projectFiles, reviewed: data.has('reviewed'),
+          startDeadline, startCondition: data.get('startCondition'), professional: data.get('professional') }),
         ...(resolutionMode === 'external' && { arbiterEmail: arbiterEmail.trim() }),
         ...(file && { contractFileId: file.id }),
         refundResponseHours: Number(data.get('refundResponse')) / (data.get('refundUnit') === 'minutes' ? 60 : 1), tranches,
@@ -286,6 +312,9 @@ export function OperationNew() {
     })}>
       <section className="section form-grid">
         <h2 className="field-wide">Inmueble y comprador</h2>
+        <Field label="Tipo de acuerdo" wide><select value={startingPoint} onChange={e => setStartingPoint(e.target.value === 'custom' ? 'custom' : 'reservation')}>
+          <option value="reservation">Reserva hasta el inicio de obra</option><option value="custom">Acuerdo con condiciones personalizadas</option>
+        </select></Field>
         <Field label="Unidad"><input name="unit" required maxLength={80} placeholder="A-302" /></Field>
         <Field label="Tipo y piso de la unidad (opcional)"><input name="unitDetail" maxLength={120} placeholder="Departamento, piso 3" /></Field>
         <Field label="Nombre del comprador"><input name="buyerName" required maxLength={120} /></Field>
@@ -293,17 +322,27 @@ export function OperationNew() {
         <Field label="Precio del inmueble (USD)"><input name="price" inputMode="decimal" required /></Field>
         <Field label="Cuota inicial (USD)"><input name="deposit" inputMode="decimal" required value={deposit} onChange={(event) => setDeposit(event.target.value)} /></Field>
       </section>
-      <section className="section form-grid">
+      {reservation ? <section className="section form-grid">
+        <h2 className="field-wide">Inicio de obra</h2>
+        <Field label="Trabajo que permitirá cobrar la inicial" wide><textarea name="startCondition" required maxLength={600}
+          placeholder="Ej. Inicio de la excavación de cimentación del bloque B" /></Field>
+        <Field label="Profesional que firmará el acta"><input name="professional" required maxLength={160} /></Field>
+        <Field label="Plazo para acreditar el inicio" help="Fecha y hora de Bolivia"><input name="startDeadline" type="datetime-local" required /></Field>
+      </section> : <section className="section form-grid">
         <h2 className="field-wide">Condiciones de la preventa</h2>
-        <Field label="Punto de partida" wide><select value={startingPoint} onChange={(event) => setStartingPoint(event.target.value === 'blank' ? 'blank' : 'template')}>
-          <option value="template">Plantilla de preventa</option><option value="blank">Empezar desde cero</option>
-        </select></Field>
-        <DraftConditions key={startingPoint} rows={drafts[startingPoint]} deposit={draftAmount(deposit)}
-          onChange={(rows) => setDrafts((previous) => ({ ...previous, [startingPoint]: rows }))} />
-      </section>
+        <DraftConditions rows={drafts} deposit={draftAmount(deposit)} onChange={setDrafts} />
+      </section>}
       <section className="section form-grid">
-        <h2 className="field-wide">Contrato y resolución</h2>
-        <Field label="Contrato firmado (opcional)" wide><input name="contract" type="file" accept=".pdf,.jpg,.jpeg,.png" /></Field>
+        <h2 className="field-wide">Expediente del acuerdo</h2>
+        {reservation && projectRequirements.map(({ key, label }) => {
+          const file = projectFile(key)
+          return file ? <div key={key}><FileRow file={file} label={label} detail={file.name} /></div> :
+            <Field key={key} label={label}><input name={key} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" required /></Field>
+        })}
+        <Field label={reservation ? 'Contrato de preventa certificado' : 'Contrato firmado (opcional)'} wide><input name="contract" type="file" accept=".pdf,.jpg,.jpeg,.png" required={reservation} /></Field>
+        {reservation && <label className="field-wide resolution-consent"><input key={projectRequirements.map(({ key }) => projectFile(key)?.id ?? '').join(':')} type="checkbox" name="reviewed" required />
+          <span>Revisé que estos documentos correspondan al proyecto y al acuerdo de esta unidad.</span></label>}
+        <h2 className="field-wide">Devoluciones y desacuerdos</h2>
         <div className="field-wide"><ResolverOptions mode={resolutionMode} email={arbiterEmail} onMode={setResolutionMode} onEmail={setArbiterEmail} /></div>
         <Field label="Plazo para responder una devolución"><input name="refundResponse" type="number" min={1} max={1440} defaultValue={72} required /></Field>
         <Field label="Unidad del plazo"><select name="refundUnit" defaultValue="hours">

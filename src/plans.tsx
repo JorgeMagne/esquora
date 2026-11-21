@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import type { ReactNode } from 'react'
+import type { ReactNode, RefObject } from 'react'
+import { VaultDrawing } from './deposit-vault.tsx'
 import type { TowerStage } from './model.ts'
 
 function TracedOutline({ d }: { d: string }) {
@@ -64,15 +65,14 @@ function DraftingMask({ id, width, height }: { id: string; width: number; height
   </defs>
 }
 
-export function AccessPlan() {
+function ResidentialPlan({ children }: { children: ReactNode }) {
   const maskId = useId()
   const mask = 'url(#' + maskId + ')'
   const towerOutline = 'M284 256V113h24v-12h26v12h22v143'
   const towerGrid = 'M284 131h72l20-12m-92 30h72l20-12m-92 30h72l20-12m-92 30h72l20-12m-92 30h72l20-12m-92 30h72l20-12m-92 30h72l20-12m-74-114v143m18-143v143m18-143v143'
   const middleGrid = 'M174 117v119m21-130v128m21-128v128m23-128v128m-80-111h105l24-14m-129 35h105l24-14m-129 35h105l24-14m-129 35h105l24-14'
   const frontGrid = 'M48 259V153h68v106M48 175h68m-68 24h68m-68 24h68m-68 24h68M71 153v106m22-106v106M130 161l24-14m-24 37 24-14m-24 37 24-14m-24 37 24-14'
-  return <BlueprintFrame className="access-plan-frame">
-    <svg className="access-plan" width="420" height="308" viewBox="0 0 420 308"
+  return <svg className="access-plan" width="420" height="308" viewBox="0 0 420 308"
       fill="none" aria-hidden="true" focusable="false">
       <DraftingMask id={maskId} width={420} height={308} />
       <g className="access-plan-guides" stroke="currentColor" strokeWidth=".75">
@@ -118,6 +118,13 @@ export function AccessPlan() {
         <path d="M277 212h4" stroke="var(--blue)" />
       </g>
 
+      {children}
+    </svg>
+}
+
+export function AccessPlan() {
+  return <BlueprintFrame className="access-plan-frame">
+    <ResidentialPlan>
       <path className="plan-face plan-roof" d="M126 194l26-15h124l-26 15z" />
       <path className="plan-face plan-side" d="M250 194l26-15v79l-26 15z" />
       <path className="plan-face" d="M126 194h124v79H126z" />
@@ -130,7 +137,7 @@ export function AccessPlan() {
         <circle cx="188" cy="233.5" r="17" fill="var(--blue-wash)" stroke="var(--blue)" />
         <path d="M184 232v-3a4 4 0 0 1 8 0v3m-10 0h12v9h-12zM188 235v3" stroke="var(--blue)" />
       </g>
-    </svg>
+    </ResidentialPlan>
   </BlueprintFrame>
 }
 
@@ -159,33 +166,12 @@ export function Tower({ unit, stage = 'planned' }: { unit?: string; stage?: Towe
   </BlueprintFrame>
 }
 
-export function ProtectionPlan({ className, protectedFunds = false }: { className?: string; protectedFunds?: boolean }) {
-  const classes = ['protection-plan', protectedFunds && 'plan-protected', className].filter(Boolean).join(' ')
-  return <svg className={classes} viewBox="8 30 272 170" fill="none" aria-hidden="true">
-    <g className="plan-guides" stroke="currentColor" strokeWidth=".7">
-      <path d="M13 149l94 44 168-62-93-43zM24 161l74 35 156-58M42 167l150-58M51 166l76 19m-38-33 82 17m-43-32 88 16" />
-      <path d="M29 134h232M95 40v142M220 35v129" strokeDasharray="2 4" />
-    </g>
-    <g className="plan-neighbors" stroke="currentColor" strokeWidth=".85">
-      <path className="plan-face" d="M25 103l29-22 26 22v39H25zM54 81l29-15 26 22-29 15zM80 103l29-15v39l-29 15z" />
-      <path d="M34 111h12v11H34zM57 111h12v11H57zM46 142v-14h12v14M88 109l13-7v13l-13 7z" />
-      <path className="plan-face" d="M199 61l26-14h35v65l-26 14h-35z" />
-      <path d="M199 61h35l26-14m-26 14v65m-35-49h35l26-14M199 92h35l26-14m-61 29h35l26-14M216 61v65m30-72v65" strokeDasharray="2.2 2.5" />
-    </g>
-    <path className="plan-face plan-roof" d="M92 77l34-19h86l-34 19z" />
-    <path className="plan-face plan-side" d="M178 77l34-19v76l-34 19z" />
-    <path className="plan-face" d="M92 77h86v76H92z" />
-    <TracedOutline d="M92 153V77l34-19h86v76l-34 19H92M92 77h86l34-19M178 77v76" />
-    <g className="plan-vault-door" stroke="currentColor" strokeWidth="1">
-      <path d="M102 86h66v57h-66z" />
-      <path d="M107 91h56v47h-56z" />
-      <path d="M98 88h7v14h-7zM98 127h7v14h-7zM157 108v13" className="plan-face" />
-      <circle cx="132" cy="114.5" r="12" />
-      <circle cx="132" cy="114.5" r="6" />
-      <path d="M132 101v7m0 13v7m-13-13.5h7m12 0h7" />
-    </g>
-    <g className="plan-guides" stroke="currentColor" strokeWidth=".7">
-      <path d="M91 164h88m-87-4v8m86-8v8m7-6 31-17m-31 13v8m31-25v8" />
-    </g>
-  </svg>
+export function ProtectionPlan({ className, settled, planRef }: { className: string; settled: boolean; planRef: RefObject<SVGGElement | null> }) {
+  return <BlueprintFrame className={'protection-plan ' + className}>
+    <ResidentialPlan>
+      <g ref={planRef} className="vault-on-plan" transform="translate(20 92) scale(1.18)">
+        <VaultDrawing settled={settled} />
+      </g>
+    </ResidentialPlan>
+  </BlueprintFrame>
 }

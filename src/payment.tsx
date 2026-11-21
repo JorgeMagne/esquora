@@ -5,6 +5,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { api, ApiError, depositInProgress, operationPath, paymentPath, useSession, write, type DepositOrder } from './api.ts'
 import { formatDate, money } from './model.ts'
 import { ProtectionPlan } from './plans.tsx'
+import { VaultFlight } from './deposit-vault.tsx'
 import { ActionLink, Amount, Back, ExplorerLink, Feedback, Loading, useWork } from './ui.tsx'
 import './payment.css'
 
@@ -30,6 +31,7 @@ export function Bank() {
   const task = useWork()
   const query = useQueryClient()
   const title = useRef<HTMLHeadingElement>(null)
+  const plan = useRef<SVGGElement>(null)
   const focusAfterPayment = useRef(false)
   const [expired, setExpired] = useState('')
   const [needsCheck, setNeedsCheck] = useState('')
@@ -46,6 +48,11 @@ export function Bank() {
     },
   })
   const data = order.data
+  const [observedOrder, setObservedOrder] = useState('')
+  useEffect(() => {
+    if (data && data.status !== 'settled') setObservedOrder(id)
+  }, [data, id])
+  const showDepositArrival = data?.status === 'settled' && observedOrder === id
   const operationId = data?.opId || params.get('operacion')
   const back = operationId ? operationPath(operationId) : '/'
   const stage = data?.status === 'settled' ? 'settled' : data?.status === 'queued' ? 'queued' : depositInProgress(data?.status) ? 'processing' :
@@ -57,7 +64,7 @@ export function Bank() {
 
   useEffect(() => {
     if (!focusAfterPayment.current || stage === 'review') return
-    title.current?.focus()
+    title.current?.focus({ preventScroll: stage === 'settled' })
     if (stage !== 'queued' && stage !== 'processing') focusAfterPayment.current = false
   }, [stage])
 
@@ -110,20 +117,22 @@ export function Bank() {
     </div>
     {order.isPending && <Loading>Consultando el pago…</Loading>}
     {!data && order.isError && <Feedback error={order.error} onRetry={() => void order.refetch()} />}
-    {data && <div className="payment-layout">
+    {data && <div className={'payment-layout' + (stage === 'settled' ? ' payment-secured' : '')}>
       <header className="payment-header">
-        <h1 ref={title} tabIndex={-1}>{paymentHeadings[stage]}</h1>
+        <h1 ref={title} tabIndex={-1} aria-live="polite" aria-atomic="true">{showDepositArrival ?
+          <>Tu dinero ahora está <span className="deposit-protected-word">protegido.</span></> : paymentHeadings[stage]}</h1>
         {data.concept && <p>{data.concept.replace(/^Cuota inicial · /, '')}</p>}
       </header>
       <div className="payment-amount">
-        <span>{stage === 'settled' ? 'Importe depositado' :
+        <span>{stage === 'settled' ? 'Depósito confirmado en Stellar Testnet' :
           stage === 'expired' ? 'Cotización anterior' : 'Total del depósito'}</span>
-        {stage === 'settled' ? <Amount cents={data.amount} /> : <Amount cents={data.amountBob} currency="Bs" />}
+        {stage === 'settled' ? <Amount cents={data.amount} currency="USDC" /> : <Amount cents={data.amountBob} currency="Bs" />}
       </div>
-      <ProtectionPlan className="payment-plan" protectedFunds={stage === 'settled'} />
+      <ProtectionPlan className="payment-plan" planRef={plan} settled={stage === 'settled'} />
+      {showDepositArrival && <VaultFlight key={id} plan={plan} />}
       <div className="payment-review">
         <dl className="details payment-details">
-          {stage === 'settled' ? <div><dt>Pago simulado</dt><dd>{money(data.amountBob, 'Bs')}</dd></div> :
+          {stage === 'settled' ? <div><dt>Pagaste en bolivianos de prueba</dt><dd>{money(data.amountBob, 'Bs')}</dd></div> :
             <div><dt>{canPay ? 'Quedará protegido' : 'Cuota inicial'}</dt><dd>{money(data.amount)}</dd></div>}
           {canPay && <>
             <div><dt>Tipo de cambio de prueba</dt><dd>Bs {bolivianRate.format(data.rate)} por USD</dd></div>

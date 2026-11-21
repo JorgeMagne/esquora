@@ -95,6 +95,9 @@ export function submitResolutionInstruction(op: OpRow, tranche: TrancheRow, user
   if (tranche.refund_response === 'accepted' && toBuyer !== tranche.amount) {
     throw new HttpError(400, 'La devolución aceptada debe cubrir el importe íntegro del tramo.')
   }
+  if (JSON.parse(op.terms_json).reserva && !tranche.evidence_at && toBuyer !== tranche.amount) {
+    throw new HttpError(400, 'Sin acta presentada, la resolución debe devolver la inicial al comprador.')
+  }
   const submittedExplanation = typeof body.explanation === 'string' ? body.explanation.trim() : ''
   if (!submittedExplanation || submittedExplanation.length > 1200) throw new HttpError(400, 'Describe la instrucción y la referencia de la resolución.')
   const fileId = typeof body.fileId === 'string' && body.fileId.length <= 80 ? body.fileId : null
