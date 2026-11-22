@@ -6,7 +6,7 @@ const chapterTiming = [
   { trace: [.07, .33], ledger: [.29, .56], seal: [.55, .61], approval: [.61, .74] },
 ] as const
 const chapterDuration = [1080, 1180, 1110, 890, 930]
-const wheelPause = 155
+const wheelPause = 320
 
 function easeBetween(value: number, start: number, end: number) {
   const progress = Math.max(0, Math.min(1, (value - start) / (end - start)))
@@ -129,7 +129,8 @@ export function setupReservationJourney(section: HTMLElement) {
     const position = travel()
     const bounds = board.getBoundingClientRect()
     const visible = bounds.bottom <= window.innerHeight && bounds.top >= 0
-    if (!openingFinished) {
+    const index = Math.max(0, Math.min(steps.length - 1, Math.round((position - 8) / distance)))
+    if (!openingFinished && index === 0) {
       if (visible && position >= 0 && position <= trackEnd() && !hasPlayed) play(0)
       else if (active === -1) {
         showChapter(0)
@@ -137,7 +138,6 @@ export function setupReservationJourney(section: HTMLElement) {
       }
       return
     }
-    const index = Math.max(0, Math.min(steps.length - 1, Math.round((position - 8) / distance)))
     if (visible && index !== active) play(index)
   }
 
@@ -181,17 +181,27 @@ export function setupReservationJourney(section: HTMLElement) {
     return true
   }
 
-  function measure() {
-    if (scrollFrame) window.cancelAnimationFrame(scrollFrame)
-    scrollFrame = 0
-    journey.setAttribute('data-journey-ready', '')
+  function boardFits() {
     const height = board.offsetHeight
     const recordedHeight = `${height}px`
     if (journey.style.getPropertyValue('--journey-board-height') !== recordedHeight) {
       journey.style.setProperty('--journey-board-height', recordedHeight)
     }
     stickyTop = parseFloat(getComputedStyle(board).top)
-    const fits = height + stickyTop <= window.innerHeight - 8
+    return height + stickyTop <= window.innerHeight - 8
+  }
+
+  function measure() {
+    if (scrollFrame) window.cancelAnimationFrame(scrollFrame)
+    scrollFrame = 0
+    journey.setAttribute('data-journey-ready', '')
+    journey.removeAttribute('data-journey-compact')
+    let fits = boardFits()
+    if (!fits) {
+      journey.setAttribute('data-journey-compact', '')
+      fits = boardFits()
+      if (!fits) journey.removeAttribute('data-journey-compact')
+    }
     journey.toggleAttribute('data-journey-ready', fits)
     if (enhanced !== fits) {
       enhanced = fits
@@ -269,7 +279,7 @@ export function setupReservationJourney(section: HTMLElement) {
     const units = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? window.innerHeight : 1
     if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return
     const direction = Math.sign(event.deltaY)
-    const now = performance.now()
+    const now = event.timeStamp
     if (direction !== wheelDirection || now - wheelTime > wheelPause) wheelConsumed = false
     wheelTime = now
     wheelDirection = direction
@@ -335,8 +345,11 @@ export function setupReservationJourney(section: HTMLElement) {
   window.addEventListener('touchcancel', endTouch, { passive: true })
 
   window.addEventListener('keydown', event => {
-    if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey || event.repeat) return
-    if (event.target instanceof Element && event.target.closest('a,button,input,select,textarea,summary,[contenteditable]')) return
+    if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return
+    if (event.target instanceof Element) {
+      if (event.target.closest('input,select,textarea,[contenteditable]')) return
+      if (event.key === ' ' && event.target.closest('button,summary')) return
+    }
     const direction = event.key === 'ArrowDown' || event.key === 'PageDown' ? 1
       : event.key === 'ArrowUp' || event.key === 'PageUp' ? -1
       : event.key === ' ' ? (event.shiftKey ? -1 : 1) : 0
