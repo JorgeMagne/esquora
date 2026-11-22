@@ -250,9 +250,29 @@ La cuenta del mercado, para departamentos en preventa en toda Bolivia:
 | Ingreso anual potencial, solo con la inicial | USD 230.600 | 2.100 × USD 12.200 × 0,9 % |
 | Ingreso anual potencial, con toda la compra por hitos | USD 1.152.900 | 2.100 × USD 61.000 × 0,9 % |
 
-Son estimaciones del equipo y cuentan solo departamentos. Terrenos, casas y lotes se suman aparte. [Supuestos y sensibilidad](investigacion-esquora/SINTESIS-PREVENTA-ESQUORA.md) · [Cuantificación nacional](investigacion-esquora/CUANTIFICACION-NACIONAL-ANTICIPOS.md)
+Son estimaciones del equipo y cuentan solo departamentos. Terrenos, casas y lotes se suman aparte. [Supuestos y cálculo](investigacion-esquora/RESERVAS-INICIALES-Y-PERJUICIO-2026-11-21.md) · [Cuantificación nacional](investigacion-esquora/CUANTIFICACION-NACIONAL-ANTICIPOS.md)
 
 **Dos cifras del problema que miden cosas distintas.** Los **USD 3,1 millones al año** son un escenario del equipo sobre adelantos de viviendas y lotes expuestos a incumplimientos, construido desde las restituciones que reporta Defensa del Consumidor. Los **USD 12 millones** son el perjuicio que una sola investigación en Santa Cruz estimó en 2025, acumulado en varios proyectos y años. La segunda no es anual ni forma parte de la primera, y no se suman. [Cálculo y fuentes](investigacion-esquora/RESERVAS-INICIALES-Y-PERJUICIO-2026-11-21.md)
+
+## Por qué un promotor lo ofrece
+
+- **Cierra reservas que hoy se caen.** El comprador que duda en adelantar dinero reserva cuando ve que su adelanto queda protegido. El promotor llega además a compradores de otras ciudades, que firman y depositan a distancia.
+- **Cobra con el hito que él mismo ofreció.** El dinero se libera con la condición que ya figura en su oferta, como el acta de inicio de obra.
+- **No tiene costo de entrada.** Abrir una reserva no cuesta nada y no hay mensualidad. El 0,9 % se descuenta cuando el dinero llega a su destino.
+- **Protege cada reserva, no el proyecto entero.** El fideicomiso bancario se estructura a medida para un proyecto. El modelo registrado en ASFI que revisamos prevé un cargo único de estructuración, una mensualidad fija y gastos por cada pago, y los tarifarios bancarios consultados no publican un precio para una reserva individual. Una reserva en ESQUORA se abre desde el celular en minutos. [Comparación con los bancos](investigacion-esquora/BANCOS-Y-COMPRADORES-EN-BOLIVIA.md)
+
+**La comisión en una devolución.** La comisión se cobra cuando el dinero llega a su destino, también cuando vuelve al comprador. En ese caso el comprador recupera el 98,8 % de su adelanto y conoce ese importe antes de depositar.
+
+## Validación con compradores y una promotora
+
+Conversaciones del equipo con personas reales, en noviembre de 2026.
+
+| Grupo | Cuántos | Dónde | Resultado |
+| --- | ---: | --- | --- |
+| Personas que piensan comprar o invertir en preventa | 5 | 3 en Oruro y 2 en Santa Cruz | A las cinco les interesó. Cuatro dijeron que usarían ESQUORA para proteger su inversión. La quinta pidió entender mejor cómo funciona antes de decidir. |
+| Promotoras | 1 | La Paz | Le interesó. Quiere conocer el proceso y probar la aplicación. |
+
+El perfil de cada persona, qué busca y qué le preocupa están en las [notas de las entrevistas](investigacion-esquora/ENTREVISTAS.md).
 
 ## Del banco simulado a bolivianos reales
 
@@ -306,6 +326,7 @@ Al crear el acuerdo, las partes eligen una de dos modalidades. En ninguna de las
 | Cómo entra | Recibe una invitación en su correo, crea su cuenta en ESQUORA y acepta el encargo antes de que el acuerdo llegue al comprador. | Queda designado cuando las dos partes aceptan el mandato. |
 | Qué hace | Revisa el expediente y firma la resolución documentada. Con esa firma se ejecuta el reparto. | Recibe los documentos con los que las partes resolvieron su desacuerdo por la vía que ellas eligieron. Verifica que sean auténticos, que estén vigentes y que se apliquen a esa reserva. Si lo permiten, libera el dinero al promotor o lo devuelve al comprador. |
 | Qué pasa si falta algo | El dinero sigue protegido en el contrato. | El dinero sigue protegido hasta que las partes aporten una instrucción verificable. |
+| Qué responsabilidad asume | Responde como mandatario. Debe cumplir el encargo o resarcir el daño, actuar con diligencia, e informar y rendir cuentas a las partes (Código Civil, arts. 814, 815 y 817). | La misma. Sus términos limitan su actuación a ejecutar una instrucción documentada. |
 | Cuánto cuesta | Sin cargo adicional de ESQUORA. Rige la comisión del 0,9 % sobre el importe liquidado. El honorario de esa persona, si lo hay, lo pactan las partes con ella. | Sin cargo adicional. Rige la misma comisión del 0,9 % sobre el importe liquidado. |
 
 ESQUORA no resuelve la disputa. Las partes la resuelven de común acuerdo o por la vía que fijaron en su contrato, y ESQUORA ejecuta lo que ese resultado indica. [Términos del mandato](shared/resolution-terms.ts)
