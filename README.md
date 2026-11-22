@@ -183,7 +183,7 @@ Estas pantallas son de la aplicación tal como la ve la compradora durante la re
     <td width="33%"><img src="docs/capturas/3-deposito.jpg" alt="Pantalla de Mi compra con 200 dólares aún protegidos" width="240"></td>
   </tr>
   <tr>
-    <td><strong>1. Acuerdo y firma.</strong> La compradora revisa las partes, el precio, el contrato y quién resuelve un desacuerdo. Al aceptar se crea el contrato en la red. <a href="https://stellar.expert/explorer/testnet/tx/f1009c27883bf5d495a5451be59a82fdac73dc5fa40b69eb713f5acd610a188e">Ver transacción</a></td>
+    <td><strong>1. Acuerdo y firma.</strong> La compradora revisa las partes, el precio, el contrato y quién actúa como tercero designado. Al aceptar se crea el contrato en la red. <a href="https://stellar.expert/explorer/testnet/tx/f1009c27883bf5d495a5451be59a82fdac73dc5fa40b69eb713f5acd610a188e">Ver transacción</a></td>
     <td><strong>2. Pago.</strong> Paga en bolivianos en un banco de prueba y ve cuánto quedará protegido. Este paso se simula y no genera transacción.</td>
     <td><strong>3. Depósito.</strong> Los 200 USDC de prueba quedan retenidos en el contrato. <a href="https://stellar.expert/explorer/testnet/tx/2978c472ede5567b882ff3ebc6ec2faece54ad4c9aab6cb02fec2ad9ec3b39e8">Ver transacción</a></td>
   </tr>
@@ -260,17 +260,55 @@ Hoy el pago en bolivianos y la conversión se simulan en una pasarela rotulada c
 
 El reemplazo previsto, en orden:
 
-1. **Entrada y salida en bolivianos con Pollar.** Pollar anuncia cobro por QR bancario en Bolivia. El comprador paga su adelanto por QR y el promotor retira a su cuenta bancaria por la misma vía. Falta confirmar con Pollar los límites por operación, el costo y quién figura como titular.
+1. **Entrada y salida en bolivianos con Pollar.** Pollar ya documenta una rampa en bolivianos, operada por Stereum, con compra por QR bancario y venta a una cuenta bancaria. El comprador paga su adelanto por QR y el promotor recibe en su cuenta. [Proveedores de rampa de Pollar](https://docs.pollar.xyz/docs/operator-guide/ramps/providers)
 2. **USDC en la red principal.** La reserva ya usa USDC de Circle en Testnet. Trustless Work ofrece el mismo contrato en Mainnet, así que se sustituyen la red, las cuentas y las claves, no el recorrido.
 3. **Dos estados separados en pantalla.** El comprobante en Stellar acredita el movimiento en la red. El abono en el banco es un paso posterior y se muestra como tal.
 
-No encontramos en el directorio público de Stellar un anchor que opere con bolivianos. Si aparece uno, la integración estándar sería SEP-24.
+Esa rampa entrega USDC en Polygon y Pollar lo lleva a Stellar con el puente CCTP de Circle, el camino que su documentación describe para una aplicación que opera solo en Stellar. Pollar también integra anchors con el estándar SEP-24. [Cómo funcionan las rampas en Pollar](https://docs.pollar.xyz/docs/core-concepts/ramps)
 
 **Dependencias antes de mover dinero real.**
 
-- **Marco regulatorio.** La [Resolución de Directorio 082/2024 del BCB](https://www.bcb.gob.bo/webdocs/01_resoluciones/RD%20082%202024.pdf) habilitó los canales electrónicos de pago para activos virtuales, y el [DS 5384](https://www.asfi.gob.bo/sites/default/files/2025-08/Decreto%20Supremo%20N%C2%B0%205384%20de%20fecha%207%20de%20mayo%20de%202025.pdf) regula a las empresas de tecnología financiera. Queda por determinar el encuadre de este flujo y quién puede operar la rampa.
+- **Marco regulatorio.** Las normas que lo permiten ya están vigentes y se resumen en [Marco legal en Bolivia](#marco-legal-en-bolivia). La conversión entre bolivianos y USDC queda a cargo de un proveedor autorizado, no de ESQUORA.
 - **Costo de conversión.** El 0,9 % no es el costo total para el usuario. La conversión entre bolivianos y USDC se cotiza aparte.
 - **Devoluciones.** Un adelanto puede volver semanas después, con otra cotización. El acuerdo debe decir quién asume esa diferencia.
+
+## Marco legal en Bolivia
+
+El modelo de ESQUORA se apoya en normas que ya están vigentes en Bolivia. Cada respuesta cita su fuente oficial.
+
+| Pregunta | Respuesta | Respaldo |
+| --- | --- | --- |
+| ¿Se puede operar con activos virtuales como USDC? | **Sí.** El 25 de junio de 2024 el Banco Central dejó sin efecto su Resolución 144/2020 y habilitó los canales e instrumentos electrónicos de pago para comprar y vender activos virtuales. Un año después reportó operaciones acumuladas por USD 430 millones. | Resolución de Directorio 082/2024. [Comunicado CP35/2024](https://www.bcb.gob.bo/webdocs/10_notas_prensa/CP_35%20NormativaActivosVirtuales.pdf) · [Comunicado CP24/2025](https://www.bcb.gob.bo/webdocs/10_notas_prensa/CP-24_Un%20a%C3%B1o%20AV%20FINAL%2027jun25.pdf) |
+| ¿Existe un marco para las empresas que trabajan con esta tecnología? | **Sí.** La Ley 1543 facultó al Ejecutivo a reglamentar las Empresas de Tecnología Financiera y el Decreto Supremo 5384, de mayo de 2025, lo hizo. El decreto define activo virtual, blockchain y proveedor de servicios de activos virtuales, y encarga la autorización a ASFI. ASFI lo reglamentó con la Circular ASFI/885/2025 y la UIF fijó las medidas contra el lavado de activos con la Resolución Administrativa 019/2025. | [DS 5384](https://www.lexivox.org/norms/BO-DS-N5384.xhtml) · [Documento de ASFI](https://asfi.gob.bo/sites/default/files/2025-10/Entorno%20Controlado%20de%20Pruebas%20Hacia%20un%20Sistema%20Financiero%20Inclusivo%20y%20Seguro%20en%20Bolivia.pdf) |
+| ¿Vale el acuerdo que firman comprador y promotor? | **Sí.** Las partes pueden determinar libremente el contenido de su contrato, y ese contrato tiene fuerza de ley entre ellas. La ley reconoce además las transacciones hechas mediante documento digital. | [Código Civil](https://web.oep.org.bo/wp-content/uploads/2023/02/DL-12760-CODIGO-CIVIL-BOLIVIANO.pdf), arts. 454 y 519 · [Ley 164](https://www.lexivox.org/norms/BO-L-N164.xhtml), art. 86 |
+| ¿Se puede pactar que el adelanto espere en USDC? | **Sí, por acuerdo de las dos partes.** El Banco Central establece que nadie está obligado a recibir un activo virtual, así que su uso es voluntario. ESQUORA lo cumple porque solo funciona con la firma de ambos. El precio sigue fijado en el contrato de compraventa, y el comprador paga y el promotor cobra en bolivianos. | [Comunicado CP35/2024](https://www.bcb.gob.bo/webdocs/10_notas_prensa/CP_35%20NormativaActivosVirtuales.pdf) · Código Civil, arts. 404 a 406 |
+| ¿Es válida la figura del tercero designado? | **Sí.** Es un mandato. Una persona se obliga a realizar un acto por cuenta de quien se lo encarga, el encargo puede constar en documento privado y el mandatario no puede hacer nada más allá de lo que se le prescribió. | Código Civil, arts. 804, 805 y 811 |
+
+**Cómo encaja ESQUORA en ese marco.**
+
+- **No reemplaza el contrato de preventa.** Ese contrato sigue sus propias reglas, incluida la certificación que prevé el [DS 4732](https://faolex.fao.org/docs/pdf/bol211366.pdf). ESQUORA añade el acuerdo sobre dónde espera el adelanto y qué hecho lo libera.
+- **No custodia el dinero.** El adelanto queda en el contrato de Trustless Work y cada movimiento lo firma, desde su propia cuenta, la persona a la que le corresponde.
+- **No convierte moneda.** El paso entre bolivianos y USDC queda a cargo de un proveedor autorizado.
+
+**La ruta para operar con dinero real.**
+
+1. **Firma digital certificada.** La Ley 164 da validez jurídica y probatoria al documento firmado con firma digital (art. 78). En la operación real, el acuerdo de ESQUORA se firma con ella.
+2. **Autorización de ASFI.** El DS 5384 incluye la categoría «Soluciones con Blockchain, Activos Tokenizados, Activos Virtuales y/o PSAV» y crea un Entorno Controlado de Pruebas, donde una empresa prueba su servicio «bajo condiciones reales, limitadas y controladas». ESQUORA entra por esa vía.
+3. **Rampa con un proveedor autorizado.** El comprador paga y el promotor cobra en bolivianos. El detalle está en [Del banco simulado a bolivianos reales](#del-banco-simulado-a-bolivianos-reales).
+
+## Quién actúa como tercero designado
+
+Al crear el acuerdo, las partes eligen una de dos modalidades. En ninguna de las dos el tercero decide por su cuenta adónde va el dinero.
+
+| | Un tercero que las partes designan | ESQUORA como tercero |
+| --- | --- | --- |
+| Quién es | Una persona de confianza de ambas partes. | El equipo de ESQUORA, bajo un mandato con términos que comprador y promotor aceptan al firmar. |
+| Cómo entra | Recibe una invitación en su correo, crea su cuenta en ESQUORA y acepta el encargo antes de que el acuerdo llegue al comprador. | Queda designado cuando las dos partes aceptan el mandato. |
+| Qué hace | Revisa el expediente y firma la resolución documentada. Con esa firma se ejecuta el reparto. | Recibe los documentos con los que las partes resolvieron su desacuerdo por la vía que ellas eligieron. Verifica que sean auténticos, que estén vigentes y que se apliquen a esa reserva. Si lo permiten, libera el dinero al promotor o lo devuelve al comprador. |
+| Qué pasa si falta algo | El dinero sigue protegido en el contrato. | El dinero sigue protegido hasta que las partes aporten una instrucción verificable. |
+| Cuánto cuesta | Sin cargo adicional de ESQUORA. Rige la comisión del 0,9 % sobre el importe liquidado. El honorario de esa persona, si lo hay, lo pactan las partes con ella. | Sin cargo adicional. Rige la misma comisión del 0,9 % sobre el importe liquidado. |
+
+ESQUORA no resuelve la disputa. Las partes la resuelven de común acuerdo o por la vía que fijaron en su contrato, y ESQUORA ejecuta lo que ese resultado indica. [Términos del mandato](shared/resolution-terms.ts)
 
 ## Equipo y aportes
 
@@ -291,10 +329,11 @@ Dónde está el trabajo de cada área:
 - **Producto y red.** Integración con Stellar, Trustless Work y Pollar en [server/](server/), firma en [src/signing.tsx](src/signing.tsx) y reglas compartidas en [shared/](shared/).
 - **Aplicación y página pública.** Los tres perfiles en [src/](src/) y la página en [conoce/](conoce/).
 - **Mercado y validación.** [Investigación](investigacion-esquora/) y [entrevistas](investigacion-esquora/ENTREVISTAS.md).
-- **Presentación.** [Guion del pitch y de la demo](GUION-PITCH.md).
+- **Presentación.** [Pitch deck en PDF](docs/ESQUORA-Pitch-Deck.pdf) y [guion del pitch y de la demo](GUION-PITCH.md).
 
 ## Documentación del proyecto
 
+- [Pitch deck en PDF](docs/ESQUORA-Pitch-Deck.pdf). Las 19 láminas de la presentación.
 - [Entrevistas con compradores y una promotora](investigacion-esquora/ENTREVISTAS.md). Qué se preguntó y qué respondieron.
 - [Contrato de dirección](CONTRATO-DE-DIRECCION.md) y [modelo ejecutable de referencia](scripts/referencia/contrato-direccion.ts). Reglas de la reserva y escenarios de aceptación.
 - [Guía visual](DESIGN.md) y [maqueta aprobada de Mi compra](diseno/maquetas/compra.html). Dirección de diseño y referencia de interfaz.
