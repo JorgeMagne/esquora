@@ -3,12 +3,12 @@ import type { ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { PollarClient } from '@pollar/core'
 import { PollarProvider, usePollar } from '@pollar/react'
-import { ArrowRight, CircleCheck, LogOut, Mail } from 'lucide-react'
+import { ArrowRight, CircleCheck, CirclePlay, LogOut, Mail } from 'lucide-react'
 import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router'
 import { useSession, write, type Session, type User } from './api.ts'
 import { initials, roleNames, wait } from './model.ts'
 import { AccessPlan } from './plans.tsx'
-import { ActionLink, Feedback, Field, Loading, Submit, Title, useWork } from './ui.tsx'
+import { ActionLink, Dialog, Feedback, Field, Loading, Submit, Title, useWork } from './ui.tsx'
 import '@pollar/react/styles.css'
 
 const sessionKey = ['/me']
@@ -124,6 +124,7 @@ export function Login() {
   const [serverError, setServerError] = useState<string | null>(null)
   const [connecting, setConnecting] = useState(false)
   const [creating, setCreating] = useState(false)
+  const [guide, setGuide] = useState(false)
   const client = pollar.getClient()
   const [state, setState] = useState(() => client.getAuthState())
   useEffect(() => {
@@ -162,6 +163,9 @@ export function Login() {
     <section className="access-copy">
       <h1>Entra a tu cuenta</h1>
       <p>Consulta tu operación, revisa sus condiciones y encuentra tus comprobantes.</p>
+      {!reauthenticate && <button className="button secondary demo-guide-button" type="button" onClick={() => setGuide(true)}>
+        <CirclePlay size={18} aria-hidden="true" />Cómo probar la demo
+      </button>}
     </section>
     <section className="access-form" aria-label="Métodos de acceso">
       {!pollarKey ? <Feedback error="El acceso todavía no está disponible en este entorno." /> : <>
@@ -215,12 +219,18 @@ export function Login() {
           </>}
       </>}
     </section>
-    {!reauthenticate && <aside className="access-hint" aria-label="Cómo probar la demo">
-      <h2>Para recorrer la demo completa</h2>
-      <p>Crea dos cuentas con correos distintos: una como <strong>Desarrollador</strong>, que ofrece el inmueble, y otra como <strong>Comprador</strong>.</p>
-      <p>Al definir la resolución, elige <strong>Invitar a un tercero</strong> y escribe <strong className="access-hint-email">amagnesoto@gmail.com</strong>. El equipo de ESQUORA actuará como tercero designado.</p>
-    </aside>}
     <div className="access-drawing"><AccessPlan /></div>
+    {guide && <Dialog title="Cómo probar la demo" onClose={() => setGuide(false)}>
+      <ol className="demo-steps">
+        <li><strong>Crea dos cuentas.</strong> Una como Desarrollador y otra como Comprador, con correos distintos.</li>
+        <li><strong>Arma la reserva.</strong> Con la cuenta de Desarrollador, crea el proyecto y el acuerdo.</li>
+        <li><strong>Elige el tercero.</strong> «ESQUORA verifica y ejecuta», o «Invitar a un tercero» con <span className="demo-email">jorgemagnesoto@gmail.com</span>, la cuenta que simula la resolución.</li>
+        <li><strong>Completa el recorrido.</strong> Con la cuenta de Comprador, firma, deposita y aprueba el avance o pide la devolución.</li>
+      </ol>
+      <div className="button-row">
+        <button className="button primary" type="button" onClick={() => setGuide(false)}>Entendido</button>
+      </div>
+    </Dialog>}
   </div>
 }
 

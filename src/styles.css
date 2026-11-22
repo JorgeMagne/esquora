@@ -231,19 +231,20 @@ a.avatar:hover::before { background: var(--ink-hover); border-color: var(--on-in
 .receivable { color: var(--muted); margin: 14px 0 0; }
 .receivable strong { color: var(--ink); }
 
-.access-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, .86fr); grid-template-rows: auto auto 1fr; column-gap: clamp(28px, 4.5vw, 60px); max-width: 900px; margin-inline: auto; padding-top: 28px; }
+.access-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, .86fr); grid-template-rows: auto 1fr; column-gap: clamp(28px, 4.5vw, 60px); max-width: 900px; margin-inline: auto; padding-top: 28px; }
 .access-copy { grid-column: 1; }
 .access-copy p, .invitation-copy > p { font-size: 1.05rem; margin-top: 14px; }
-.access-form { grid-area: 1 / 2 / 4 / 3; align-self: start; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 22px 0; }
+.access-form { grid-area: 1 / 2 / 3 / 3; align-self: start; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 22px 0; }
 .access-form > .button { width: 100%; }
 .access-form > .feedback { margin-bottom: 16px; }
 .access-drawing { grid-column: 1; margin-top: 8px; }
-.access-hint { grid-column: 1; max-width: 46ch; margin-top: 22px; padding-left: 14px; border-left: 2px solid var(--blue-wash); color: var(--muted); font-size: .9rem; }
-.access-hint h2 { margin: 0 0 4px; font-size: .9rem; font-weight: 700; letter-spacing: 0; color: var(--ink); }
-.access-hint p { margin: 0; }
-.access-hint p + p { margin-top: 6px; }
-.access-hint strong { font-weight: 600; color: var(--ink); }
-.access-hint-email { overflow-wrap: anywhere; }
+.demo-guide-button { margin-top: 18px; min-height: 44px; padding: 9px 14px; justify-content: flex-start; gap: 9px; font-size: .94rem; }
+.demo-guide-button svg { color: var(--blue); }
+.dialog:has(.demo-steps) { max-height: 90dvh; }
+.demo-steps { display: grid; gap: 12px; margin: 4px 0 18px; padding-left: 1.3em; color: var(--muted); line-height: 1.45; }
+.demo-steps li::marker { color: var(--blue); font-weight: 700; }
+.demo-steps strong { display: block; color: var(--ink); font-weight: 700; }
+.demo-email { color: var(--ink); font-weight: 600; overflow-wrap: anywhere; }
 .separator { display: flex; align-items: center; gap: 12px; margin: 12px 0; color: var(--muted); font-size: .82rem; }
 .separator::before, .separator::after { content: ""; height: 1px; background: var(--line); flex: 1; }
 .invitation { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, .88fr); max-width: 950px; align-items: center; gap: 34px; margin: 20px auto; }
@@ -398,7 +399,6 @@ a.avatar:hover::before { background: var(--ink-hover); border-color: var(--on-in
   .form-grid { gap: 13px; }
   .access-layout { grid-template-columns: minmax(0, 1fr); padding-top: 6px; }
   .access-form { grid-area: auto; margin-top: 16px; }
-  .access-hint { margin-top: 18px; }
   .activation-card { grid-template-columns: minmax(0, 1fr); margin: -6px 0 24px; padding: 16px; }
   .activation-card .button { width: 100%; }
   .activation-done { margin: -6px 0 24px; }
