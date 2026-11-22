@@ -4,7 +4,19 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [
+    {
+      name: 'esquora-public-home',
+      configureServer(server) {
+        server.middlewares.use((req, _res, next) => {
+          if (req.url?.split('?')[0] === '/') req.url = '/conoce/index.html' + req.url.slice(1)
+          next()
+        })
+      },
+    },
+    react(),
+    tailwindcss(),
+  ],
   define: { global: 'globalThis' },
   build: {
     manifest: true,

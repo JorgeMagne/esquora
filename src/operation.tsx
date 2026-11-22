@@ -68,7 +68,7 @@ function DepositReview({ operation }: { operation: Operation }) {
   const paymentUrl = (orderId: string) => paymentPath(orderId) + '?operacion=' + encodeURIComponent(id)
 
   return <div className="deposit-review">
-    <Back to="/">Mis compras</Back>
+    <Back to="/app">Mis compras</Back>
     <Title detail={project.name + ' · ' + unit}>{pending ? 'Confirmando el depósito' : 'Deposita la cuota inicial'}</Title>
     <section className="deposit-quote" aria-label="Cuota inicial">
       <Amount cents={deposit} />
@@ -101,7 +101,7 @@ function Purchase({ operation }: { operation: Operation }) {
   const approved = role === 'buyer' && tranches.some((tranche) => tranche.status === 'approved')
   const confirming = tranches.some((tranche) => tranche.pendingAction?.status === 'pending')
   return <article className="purchase">
-    {role === 'buyer' && <Back to="/">Mis compras</Back>}
+    {role === 'buyer' && <Back to="/app">Mis compras</Back>}
     <div className="purchase-hero">
       <div className="purchase-subject">
         <h1>{role === 'buyer' ? unit : role === 'arbiter' ? 'Caso ' + unit : unit}</h1>
@@ -205,7 +205,7 @@ function Agreement({ operation, fromOperation = false }: { operation: Operation;
   }
 
   return <>
-    <Back to={fromOperation ? operationPath(id) : '/'}>{fromOperation ? 'Volver a la operación' : role === 'buyer' ? 'Mis compras' : 'Operaciones'}</Back>
+    <Back to={fromOperation ? operationPath(id) : '/app'}>{fromOperation ? 'Volver a la operación' : role === 'buyer' ? 'Mis compras' : 'Operaciones'}</Back>
     <Title detail={project.name + ' · ' + operation.unit}>Acuerdo de preventa</Title>
     {sellerDraft && <section ref={nextStep} className="section draft-next-step" tabIndex={-1} aria-label="Envío del acuerdo">
       <div role="status">

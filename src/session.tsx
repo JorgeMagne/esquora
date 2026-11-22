@@ -20,7 +20,7 @@ export function PollarSession({ children }: { children: ReactNode }) {
 }
 
 export function safeReturn(path: string | null) {
-  return path && path.startsWith('/') && !path.startsWith('//') && !path.includes('\\') ? path : '/'
+  return path && path.split(/[?#]/, 1)[0] !== '/' && path.startsWith('/') && !path.startsWith('//') && !path.includes('\\') ? path : '/app'
 }
 
 export function useChangeSession() {

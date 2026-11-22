@@ -113,7 +113,7 @@ function Shell({ user, children }: { user?: User | null; children: ReactNode }) 
     enabled: signedIn,
   })
   const unread = notices.data?.unread ?? 0
-  const homeActive = location.pathname === '/' || (user?.kind === 'buyer' && !!op && !location.pathname.endsWith('/comprobantes'))
+  const homeActive = location.pathname === '/app' || (user?.kind === 'buyer' && !!op && !location.pathname.endsWith('/comprobantes'))
 
   useEffect(() => {
     window.scrollTo(0, 0)
@@ -125,7 +125,7 @@ function Shell({ user, children }: { user?: User | null; children: ReactNode }) 
       <div className="header-inner">
         <Brand />
         {signedIn && <nav className="desktop-nav" aria-label="Principal">
-          <Link to="/" aria-current={homeActive ? 'page' : undefined}>{home.label}</Link>
+          <Link to="/app" aria-current={homeActive ? 'page' : undefined}>{home.label}</Link>
           <NavLink to={middle.path}>{middle.label}</NavLink>
           {user.kind === 'buyer' && <NavLink to="/saldo">Mi saldo</NavLink>}
         </nav>}
@@ -140,7 +140,7 @@ function Shell({ user, children }: { user?: User | null; children: ReactNode }) 
     </header>
     <main id="contenido" className="page" tabIndex={-1}><Suspense fallback={<Loading />}>{children}</Suspense></main>
     {signedIn && <nav className="mobile-nav" aria-label="Principal">
-      <Link to="/" aria-current={homeActive ? 'page' : undefined}>
+      <Link to="/app" aria-current={homeActive ? 'page' : undefined}>
         <home.icon size={21} aria-hidden="true" />{home.label}</Link>
       <NavLink to={middle.path}><middle.icon size={21} aria-hidden="true" />{middle.label}</NavLink>
       <NavLink to="/cuenta"><UserRound size={21} aria-hidden="true" />Cuenta</NavLink>
@@ -181,7 +181,7 @@ function Protected({ user, kind, children }: { user?: User | null; kind?: User['
   const returnTo = encodeURIComponent(location.pathname + location.search)
   if (!user) return <Navigate to={'/entrar?volver=' + returnTo} replace />
   if (!user.kind) return <Navigate to={'/cuenta?volver=' + returnTo} replace />
-  if (kind && user.kind !== kind) return <><Title>Acceso a la operación</Title><Feedback error={'Esta pantalla requiere una cuenta de ' + roleNames[kind].toLowerCase() + '.'} /><ActionLink to="/">Volver al inicio</ActionLink></>
+  if (kind && user.kind !== kind) return <><Title>Acceso a la operación</Title><Feedback error={'Esta pantalla requiere una cuenta de ' + roleNames[kind].toLowerCase() + '.'} /><ActionLink to="/app">Volver al inicio</ActionLink></>
   return <>{children}</>
 }
 
@@ -201,7 +201,7 @@ class BankErrorBoundary extends Component<{ back: string; children: ReactNode }>
         <button className="button primary" type="button" onClick={() => window.location.reload()}>
           Volver a cargar la cotización
         </button>
-        <a className="text-link" href={this.props.back}>{this.props.back === '/' ? 'Volver al inicio' : 'Volver a la operación'}</a>
+        <a className="text-link" href={this.props.back}>{this.props.back === '/app' ? 'Volver al inicio' : 'Volver a la operación'}</a>
       </div>
     </div>
   }
@@ -218,7 +218,7 @@ function App() {
 
   return <Routes>
     <Route path="/pago/:id" element={<main className="bank-shell">
-      <BankErrorBoundary key={pathname} back={paymentOperation ? operationPath(paymentOperation) : '/'}>
+      <BankErrorBoundary key={pathname} back={paymentOperation ? operationPath(paymentOperation) : '/app'}>
         <Suspense fallback={<Loading>Abriendo la cotización…</Loading>}>
           <Protected user={user} kind="buyer"><Bank /></Protected>
         </Suspense>
@@ -228,7 +228,7 @@ function App() {
       <Routes>
         <Route path="/invitacion/:token" element={<InvitationPage />} />
         <Route path="/tercero/:token" element={<ResolverInvitationPage />} />
-        <Route path="/" element={user ? <Protected user={user}><SessionNotice user={user} /><Home user={user} /></Protected> :
+        <Route path="/app" element={user ? <Protected user={user}><SessionNotice user={user} /><Home user={user} /></Protected> :
           <PollarSession><Login /></PollarSession>} />
         <Route element={<PollarSession><Outlet /></PollarSession>}>
           <Route path="/entrar" element={<Login />} />
@@ -246,7 +246,7 @@ function App() {
         <Route path="/operaciones/:id/comprobantes" element={<Protected user={user}><Receipts /></Protected>} />
         <Route path="/comprobantes" element={<Protected user={user}><ReceiptDirectory /></Protected>} />
         <Route path="/avisos" element={<Protected user={user}><Notifications /></Protected>} />
-        <Route path="*" element={<><Title>Esta página no está disponible</Title><ActionLink to="/">Volver al inicio</ActionLink></>} />
+        <Route path="*" element={<><Title>Esta página no está disponible</Title><ActionLink to="/app">Volver al inicio</ActionLink></>} />
       </Routes>
     </Shell>} />
   </Routes>

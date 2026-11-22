@@ -6,7 +6,7 @@ import { fileLink, type FileInfo, type Totals } from './api.ts'
 import { money, numberAmount } from './model.ts'
 
 export function Brand() {
-  return <Link className="brand" to="/" aria-label="ESQUORA, inicio">
+  return <Link className="brand" to="/app" aria-label="ESQUORA, inicio">
     <img src="/esquora-logo.svg" alt="" width={284} height={66} />
   </Link>
 }

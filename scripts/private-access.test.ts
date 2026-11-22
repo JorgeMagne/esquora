@@ -59,6 +59,10 @@ test('the landing and its build assets are public while the demo keeps the exist
   app.get('/api/me', (c) => c.json({ user: null }))
   app.get('/assets/app.js', (c) => c.text('private app bundle'))
 
+  const home = await app.request(origin + '/?ref=atlas')
+  assert.equal(home.status, 200)
+  assert.equal(await home.text(), files['conoce/index.html'])
+  assert.equal((await app.request(origin + '/app')).status, 403)
   const canonical = await app.request(origin + '/conoce?ref=demo')
   assert.equal(canonical.status, 308)
   assert.equal(canonical.headers.get('Location'), '/conoce/?ref=demo')

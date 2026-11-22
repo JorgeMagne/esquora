@@ -9,7 +9,7 @@ ESQUORA permite reservar una unidad inmobiliaria en preventa y condicionar el co
 
 **Entorno del prototipo:** el pago bancario en bolivianos y la conversión se simulan. El depósito en USDC de prueba, el cobro y la devolución se registran en **Stellar Testnet**. El contrato retiene el saldo. Las personas designadas revisan los documentos y el avance de obra.
 
-[Conocer ESQUORA](https://esquora-production.up.railway.app/conoce/) · [Entrar a la demo privada](https://esquora-production.up.railway.app/entrar) · [Ejecutar en local](#ejecutar-en-local) · [Comprobantes de prueba](#comprobantes-de-prueba)
+[Conocer ESQUORA](https://esquora-production.up.railway.app/) · [Entrar a la demo privada](https://esquora-production.up.railway.app/entrar) · [Ejecutar en local](#ejecutar-en-local) · [Comprobantes de prueba](#comprobantes-de-prueba)
 
 ## Qué se puede hacer
 
@@ -129,7 +129,7 @@ Se necesita Node.js **22.22 o posterior de la serie 22**, npm y credenciales de 
 1. Ejecuta `npm ci`.
 2. Copia [.env.example](.env.example) a `.env` con `Copy-Item .env.example .env` en PowerShell o `cp .env.example .env` en macOS y Linux.
 3. Configura `VITE_POLLAR_PUBLISHABLE_KEY`, `POLLAR_SECRET_KEY` y `TRUSTLESS_WORK_API_KEY`. Registra el origen local en Pollar para el acceso interactivo.
-4. Ejecuta `npm run dev`. Abre [la aplicación](http://localhost:5173/) o [la página pública](http://localhost:5173/conoce/). Vite atiende en el puerto 5173 y reenvía `/api` a Hono en el 8787.
+4. Ejecuta `npm run dev`. Abre [la aplicación](http://localhost:5173/app) o [la página pública](http://localhost:5173/). Vite atiende en el puerto 5173 y reenvía `/api` a Hono en el 8787.
 
 Para trabajar **solo en la página pública**, usa `npm run dev:web` y abre `/conoce/`. El servidor completo prepara las cuentas de servicio en Testnet durante el arranque, por lo que necesita conexión a la red.
 
@@ -167,7 +167,7 @@ Cada reserva del siguiente ensayo recibió **200 USDC de prueba**. Con 0,9 % par
 
 El [Dockerfile](Dockerfile) construye ambas entradas con Vite y las sirve desde Hono. En Railway utiliza una réplica, un volumen escribible en `/app/data` y la comprobación de salud `GET /api/health`. Configura un origen HTTPS en `APP_URL` y registra ese origen y sus retornos autorizados en Pollar.
 
-Pasa `VITE_POLLAR_PUBLISHABLE_KEY` como argumento público de compilación. Las claves secretas se proporcionan al contenedor en ejecución. Para el control de acceso, genera un código privado de 32 bytes en Base64URL. Configura `ESQUORA_PREVIEW_CREDENTIALS` como el SHA-256 hexadecimal del **texto** de ese código, un separador `:` y una clave de sesión independiente de 32 bytes en hexadecimal. La sesión de acceso privado dura 12 horas y precede al inicio de sesión con Pollar. La página `/conoce/` y sus recursos se sirven públicamente. [Control de acceso](server/private-access.ts) · [Rutas públicas](server/landing.ts)
+Pasa `VITE_POLLAR_PUBLISHABLE_KEY` como argumento público de compilación. Las claves secretas se proporcionan al contenedor en ejecución. Para el control de acceso, genera un código privado de 32 bytes en Base64URL. Configura `ESQUORA_PREVIEW_CREDENTIALS` como el SHA-256 hexadecimal del **texto** de ese código, un separador `:` y una clave de sesión independiente de 32 bytes en hexadecimal. La sesión de acceso privado dura 12 horas y precede al inicio de sesión con Pollar. La página pública se sirve en `/` y `/conoce/`. La aplicación conserva su acceso en `/entrar` y su inicio en `/app`. [Control de acceso](server/private-access.ts) · [Rutas públicas](server/landing.ts)
 
 Conserva el directorio de datos completo entre despliegues. Antes de migrar una base anterior, la aplicación crea una copia de SQLite en `DATA_DIR`; los adjuntos y claves de servicio requieren su propio respaldo. Si Stellar reinicia Testnet, los expedientes locales se conservan y las operaciones de prueba deben recrearse en la nueva red.
 

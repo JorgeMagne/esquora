@@ -32,7 +32,7 @@ export function mountPublicLanding(server: Hono, dist: string) {
     return next()
   })
   server.get('/conoce', (c) => c.redirect('/conoce/' + new URL(c.req.url).search, 308))
-  server.get('/conoce/', (c) => {
+  server.on('GET', ['/', '/conoce/'], (c) => {
     c.header('Cache-Control', 'no-cache')
     c.header('Referrer-Policy', 'same-origin')
     return c.html(html)

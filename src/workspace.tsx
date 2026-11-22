@@ -154,7 +154,7 @@ export function ProjectNew() {
   const navigate = useNavigate()
   const query = useQueryClient()
   return <>
-    <Back to="/">Proyectos</Back>
+    <Back to="/app">Proyectos</Back>
     <Title>Nuevo proyecto</Title>
     <form className="section form-grid" onSubmit={task.submit(async (data) => {
       const values = Object.fromEntries(data)
@@ -186,7 +186,7 @@ export function ProjectPage() {
   const path = '/projects/' + id + '/docs'
 
   return <>
-    <Back to="/">Proyectos</Back>
+    <Back to="/app">Proyectos</Back>
     <Title detail={city + ' · ' + address} action={<ActionLink to={projectPath(id) + '/nueva-operacion'}>Nueva operación</ActionLink>}>{name}</Title>
     <TotalsStrip totals={stats} />
     <div className="two-column workspace-columns">
@@ -505,7 +505,7 @@ export function ResolverInvitationPage() {
       {!user ? <ActionLink to={'/entrar?volver=' + returnTo}>Entrar para ver la invitación</ActionLink> :
         !user.kind ? <ActionLink to={'/cuenta?volver=' + returnTo}>Completar mi perfil</ActionLink> :
             user.kind !== 'arbiter' ? <Feedback error="Esta invitación requiere una cuenta de tercero designado." /> :
-              accepted ? <ActionLink to="/">Ver mis casos</ActionLink> :
+              accepted ? <ActionLink to="/app">Ver mis casos</ActionLink> :
                 user.walletStatus !== 'active' ? <ActionLink to={'/cuenta?volver=' + returnTo}>Activar mi cuenta</ActionLink> :
                   <button className="button primary" type="button" disabled={task.busy} onClick={() => void task.run(async () => {
                     await write(endpoint + '/claim')

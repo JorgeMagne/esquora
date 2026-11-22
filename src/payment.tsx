@@ -54,7 +54,7 @@ export function Bank() {
   }, [data, id])
   const showDepositArrival = data?.status === 'settled' && observedOrder === id
   const operationId = data?.opId || params.get('operacion')
-  const back = operationId ? operationPath(operationId) : '/'
+  const back = operationId ? operationPath(operationId) : '/app'
   const stage = data?.status === 'settled' ? 'settled' : data?.status === 'queued' ? 'queued' : depositInProgress(data?.status) ? 'processing' :
     id === needsCheck ? 'check' : data && (id === expired || quoteExpired(data)) ? 'expired' :
       data?.status === 'failed' ? 'failed' : 'review'
