@@ -3,8 +3,8 @@ import type { ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { PollarClient } from '@pollar/core'
 import { PollarProvider, usePollar } from '@pollar/react'
-import { ArrowRight, LogOut, Mail } from 'lucide-react'
-import { Link, Navigate, useLocation, useSearchParams } from 'react-router'
+import { ArrowRight, CircleCheck, LogOut, Mail } from 'lucide-react'
+import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router'
 import { useSession, write, type Session, type User } from './api.ts'
 import { initials, roleNames, wait } from './model.ts'
 import { AccessPlan } from './plans.tsx'
@@ -41,6 +41,73 @@ export function useAuthorize() {
     }
     return pollar.getClient()
   }
+}
+
+const activationReasons: Record<NonNullable<User['kind']>, string> = {
+  developer: 'Es un paso único para firmar acuerdos y recibir los tramos liberados.',
+  buyer: 'Es un paso único para firmar tu acuerdo y depositar el adelanto.',
+  arbiter: 'Es un paso único para aceptar casos y ejecutar resoluciones.',
+}
+
+function useActivation(user: User) {
+  const session = useSession()
+  const authorize = useAuthorize()
+  const pollar = usePollar()
+  const location = useLocation()
+  const work = useWork()
+  const [message, setMessage] = useState('')
+  const matchesPollar = pollar.verified && pollar.wallet?.address === user.publicKey
+  const reconnectPath = '/entrar?reconectar=1&volver=' + encodeURIComponent(location.pathname + location.search)
+
+  async function activate() {
+    setMessage('')
+    const client = authorize()
+    const prepare = () => write<{ status: string; needsTrustline?: boolean }>('/wallet/activate')
+    const result = await prepare()
+    if (result.status !== 'active' && result.needsTrustline) {
+      const asset = session.data!.config.asset
+      const trustline = await client.setTrustline(asset)
+      if (trustline.status !== 'success' && trustline.status !== 'pending') {
+        throw new Error('La activación no se confirmó. Vuelve a intentar y acepta en la ventana de confirmación.')
+      }
+      for (let attempt = 0; attempt < 6; attempt += 1) {
+        if ((await prepare()).status === 'active') break
+        await wait(1800)
+      }
+    }
+    const next = await session.refetch()
+    setMessage(next.data?.user?.walletStatus === 'active' ? 'Tu cuenta ya está activa.' : 'La activación sigue confirmándose. Vuelve a comprobarla en unos segundos.')
+  }
+
+  return { busy: work.busy, error: work.error, message, matchesPollar, reconnectPath, start: () => void work.run(activate) }
+}
+
+export function ActivationNotice({ user }: { user: User }) {
+  const activation = useActivation(user)
+  const active = user.walletStatus === 'active'
+  const [showDone, setShowDone] = useState(false)
+  useEffect(() => {
+    if (!active || !activation.message) return
+    setShowDone(true)
+    const timer = window.setTimeout(() => setShowDone(false), 4000)
+    return () => window.clearTimeout(timer)
+  }, [active, activation.message])
+
+  if (!user.kind) return null
+  if (active) return showDone ? <p className={'activation-done activation-' + user.kind} role="status">
+    <CircleCheck size={18} aria-hidden="true" />Tu cuenta ya está activa.
+  </p> : null
+  return <section className={'activation-card activation-' + user.kind} aria-labelledby="activation-title">
+    <div className="activation-copy">
+      <h2 id="activation-title">Activa tu cuenta</h2>
+      <p>{activationReasons[user.kind]} Es posible que aparezca una ventana en inglés para confirmar.</p>
+      <Feedback error={activation.error}>{activation.message}</Feedback>
+    </div>
+    {activation.matchesPollar ?
+      <button className="button primary" type="button" onClick={activation.start} disabled={activation.busy}>
+        {activation.busy ? 'Confirmando…' : 'Activar mi cuenta'}<ArrowRight size={18} aria-hidden="true" />
+      </button> : <ActionLink to={activation.reconnectPath}>Reconectar mi cuenta</ActionLink>}
+  </section>
 }
 
 export function Login() {
@@ -148,49 +215,30 @@ export function Login() {
           </>}
       </>}
     </section>
+    {!reauthenticate && <aside className="access-hint" aria-label="Cómo probar la demo">
+      <h2>Para recorrer la demo completa</h2>
+      <p>Crea dos cuentas con correos distintos: una como <strong>Desarrollador</strong>, que ofrece el inmueble, y otra como <strong>Comprador</strong>.</p>
+      <p>Al definir la resolución, elige <strong>Invitar a un tercero</strong> y escribe <strong className="access-hint-email">amagnesoto@gmail.com</strong>. El equipo de ESQUORA actuará como tercero designado.</p>
+    </aside>}
     <div className="access-drawing"><AccessPlan /></div>
   </div>
 }
 
 export function Account({ user }: { user: User }) {
   const session = useSession()
-  const authorize = useAuthorize()
   const pollar = usePollar()
   const task = useWork()
-  const activation = useWork()
+  const activation = useActivation(user)
   const logout = useWork()
   const [params] = useSearchParams()
   const destination = safeReturn(params.get('volver'))
   const [kind, setKind] = useState(user.kind || (user.esquoraVerifier || destination.startsWith('/tercero/') ?
     'arbiter' : destination.startsWith('/invitacion/') ? 'buyer' : ''))
   const [saved, setSaved] = useState(false)
-  const [activationMessage, setActivationMessage] = useState('')
   const query = useQueryClient()
-  const location = useLocation()
+  const navigate = useNavigate()
   const changeSession = useChangeSession()
   const active = user.walletStatus === 'active'
-  const matchesPollar = pollar.verified && pollar.wallet?.address === user.publicKey
-  const reconnectPath = '/entrar?reconectar=1&volver=' + encodeURIComponent(location.pathname + location.search)
-
-  async function activate() {
-    setActivationMessage('')
-    const client = authorize()
-    const prepare = () => write<{ status: string; needsTrustline?: boolean }>('/wallet/activate')
-    const result = await prepare()
-    if (result.status !== 'active' && result.needsTrustline) {
-      const asset = session.data!.config.asset
-      const trustline = await client.setTrustline(asset)
-      if (trustline.status !== 'success' && trustline.status !== 'pending') {
-        throw new Error('La activación no se confirmó. Vuelve a intentar y acepta en la ventana de confirmación.')
-      }
-      for (let attempt = 0; attempt < 6; attempt += 1) {
-        if ((await prepare()).status === 'active') break
-        await wait(1800)
-      }
-    }
-    const next = await session.refetch()
-    setActivationMessage(next.data?.user?.walletStatus === 'active' ? 'Tu cuenta ya está activa.' : 'La activación sigue confirmándose. Vuelve a comprobarla en unos segundos.')
-  }
 
   return <>
     <Title detail={user.kind ? roleNames[user.kind] : 'Elige cómo vas a participar en una operación.'}>{user.kind ? 'Mi cuenta' : 'Completa tu perfil'}</Title>
@@ -200,9 +248,11 @@ export function Account({ user }: { user: User }) {
         <div className="profile-email"><span className="avatar" aria-hidden="true">{initials(user.name)}</span><Mail size={17} aria-hidden="true" />{user.email}</div>
         <form className="stack" onSubmit={task.submit(async (data) => {
           setSaved(false)
+          const firstSetup = !user.kind
           const updated = await write<{ user: User }>('/me', Object.fromEntries(data), 'PATCH')
           query.setQueryData<Session>(sessionKey, (previous) => previous ? { ...previous, user: updated.user } : previous)
-          setSaved(true)
+          if (firstSetup && updated.user.kind) navigate(destination, { replace: true })
+          else setSaved(true)
         })}>
           {!user.kind && user.esquoraVerifier && <>
             <input type="hidden" name="kind" value="arbiter" />
@@ -225,11 +275,11 @@ export function Account({ user }: { user: User }) {
       {user.kind && <section className="section">
         <h2>{active ? 'Cuenta activa' : 'Activa tu cuenta'}</h2>
         <p>{active ? 'Ya puedes participar en una operación.' : 'La activación habilita los movimientos de prueba de tu cuenta. Es posible que aparezca una ventana en inglés para confirmar.'}</p>
-        <Feedback error={activation.error}>{activationMessage}</Feedback>
-        {!active && (matchesPollar ?
-          <button className="button primary" type="button" onClick={() => void activation.run(activate)} disabled={activation.busy}>
+        <Feedback error={activation.error}>{activation.message}</Feedback>
+        {!active && (activation.matchesPollar ?
+          <button className="button primary" type="button" onClick={activation.start} disabled={activation.busy}>
             {activation.busy ? 'Confirmando…' : 'Activar mi cuenta'}<ArrowRight size={18} aria-hidden="true" />
-          </button> : <ActionLink to={reconnectPath}>Reconectar mi cuenta</ActionLink>)}
+          </button> : <ActionLink to={activation.reconnectPath}>Reconectar mi cuenta</ActionLink>)}
         {active && params.has('volver') && <ActionLink to={destination}>Continuar</ActionLink>}
         <div className="sign-out">
           <Feedback error={logout.error} />

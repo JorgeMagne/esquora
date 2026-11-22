@@ -1,7 +1,7 @@
-import { Component, lazy, StrictMode, Suspense, useEffect } from 'react'
+import { Component, lazy, StrictMode, Suspense, useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowRight, Bell, Building2, FolderOpen, ReceiptText, UserRound, WalletCards } from 'lucide-react'
+import { Bell, Building2, FolderOpen, ReceiptText, UserRound, WalletCards } from 'lucide-react'
 import { BrowserRouter, Link, matchPath, Navigate, NavLink, Outlet, Route, Routes, useLocation, useMatch, useSearchParams } from 'react-router'
 import type { ReactNode } from 'react'
 import { api, operationPath, read, useSession, type Notification, type OperationSummary, type User } from './api.ts'
@@ -12,6 +12,7 @@ import './styles.css'
 const PollarSession = lazy(() => import('./session.tsx').then((module) => ({ default: module.PollarSession })))
 const Login = lazy(() => import('./session.tsx').then((module) => ({ default: module.Login })))
 const Account = lazy(() => import('./session.tsx').then((module) => ({ default: module.Account })))
+const ActivationNotice = lazy(() => import('./session.tsx').then((module) => ({ default: module.ActivationNotice })))
 const Home = lazy(() => import('./workspace.tsx').then((module) => ({ default: module.Home })))
 const InvitationPage = lazy(() => import('./workspace.tsx').then((module) => ({ default: module.InvitationPage })))
 const ResolverInvitationPage = lazy(() => import('./workspace.tsx').then((module) => ({ default: module.ResolverInvitationPage })))
@@ -156,11 +157,11 @@ function AccountOnly({ user }: { user: User }) {
   </>
 }
 
-function SessionNotice({ user }: { user: User }) {
-  if (user.walletStatus === 'active') return null
-  return <div className="account-notice"><span>Activa tu cuenta para confirmar operaciones.</span>
-    <Link to="/cuenta">Ir a mi cuenta<ArrowRight size={15} aria-hidden="true" /></Link>
-  </div>
+function ActivationSlot({ user }: { user: User }) {
+  // Solo carga Pollar si la cuenta falta activar, y sigue montado para confirmar la activación.
+  const [needed] = useState(user.walletStatus !== 'active')
+  if (!needed) return null
+  return <Suspense fallback={null}><PollarSession><ActivationNotice user={user} /></PollarSession></Suspense>
 }
 
 function ReceiptDirectory() {
@@ -228,7 +229,7 @@ function App() {
       <Routes>
         <Route path="/invitacion/:token" element={<InvitationPage />} />
         <Route path="/tercero/:token" element={<ResolverInvitationPage />} />
-        <Route path="/app" element={user ? <Protected user={user}><SessionNotice user={user} /><Home user={user} /></Protected> :
+        <Route path="/app" element={user ? <Protected user={user}><ActivationSlot key={user.id} user={user} /><Home user={user} /></Protected> :
           <PollarSession><Login /></PollarSession>} />
         <Route element={<PollarSession><Outlet /></PollarSession>}>
           <Route path="/entrar" element={<Login />} />

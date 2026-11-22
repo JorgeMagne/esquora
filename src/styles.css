@@ -130,8 +130,16 @@ a.avatar:hover::before { background: var(--ink-hover); border-color: var(--on-in
 .empty { padding: 16px 0 30px; }
 .empty h2 { font-size: 1.32rem; }
 .empty p { color: var(--muted); margin: 9px 0 0; }
-.account-notice { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--line); margin-bottom: 22px; color: var(--muted); }
-.account-notice a { color: var(--blue); display: inline-flex; align-items: center; gap: 7px; }
+.activation-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 14px 32px; margin: -14px 0 30px; padding: 18px 20px; background: var(--white); border: 1px solid var(--line); border-left: 3px solid var(--blue); }
+.activation-card h2 { margin: 0; font-size: 1.08rem; }
+.activation-card p { margin: 5px 0 0; color: var(--muted); max-width: 62ch; }
+.activation-card .feedback { margin-top: 12px; }
+.activation-card .button { flex: none; }
+.activation-done { display: flex; align-items: center; gap: 8px; margin: -14px 0 30px; padding: 12px 0; color: var(--blue-dark); font-weight: 600; border-bottom: 1px solid var(--line); }
+.activation-buyer { max-width: 1080px; margin-inline: auto; }
+@media (prefers-reduced-motion: no-preference) {
+  .activation-card, .activation-done { animation: reveal-access-step 220ms cubic-bezier(.2, .75, .25, 1) both; }
+}
 .account-saldo { margin: 10px 0; }
 
 .button { display: inline-flex; min-height: 48px; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 16px; border: 1px solid transparent; font-size: 1rem; font-weight: 700; line-height: 1.25; text-align: left; text-decoration: none; transition: background-color 150ms ease, color 150ms ease; }
@@ -223,13 +231,19 @@ a.avatar:hover::before { background: var(--ink-hover); border-color: var(--on-in
 .receivable { color: var(--muted); margin: 14px 0 0; }
 .receivable strong { color: var(--ink); }
 
-.access-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, .86fr); grid-template-rows: auto 1fr; column-gap: clamp(28px, 4.5vw, 60px); max-width: 900px; margin-inline: auto; padding-top: 28px; }
+.access-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, .86fr); grid-template-rows: auto auto 1fr; column-gap: clamp(28px, 4.5vw, 60px); max-width: 900px; margin-inline: auto; padding-top: 28px; }
 .access-copy { grid-column: 1; }
 .access-copy p, .invitation-copy > p { font-size: 1.05rem; margin-top: 14px; }
-.access-form { grid-area: 1 / 2 / 3 / 3; align-self: start; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 22px 0; }
+.access-form { grid-area: 1 / 2 / 4 / 3; align-self: start; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 22px 0; }
 .access-form > .button { width: 100%; }
 .access-form > .feedback { margin-bottom: 16px; }
 .access-drawing { grid-column: 1; margin-top: 8px; }
+.access-hint { grid-column: 1; max-width: 46ch; margin-top: 22px; padding-left: 14px; border-left: 2px solid var(--blue-wash); color: var(--muted); font-size: .9rem; }
+.access-hint h2 { margin: 0 0 4px; font-size: .9rem; font-weight: 700; letter-spacing: 0; color: var(--ink); }
+.access-hint p { margin: 0; }
+.access-hint p + p { margin-top: 6px; }
+.access-hint strong { font-weight: 600; color: var(--ink); }
+.access-hint-email { overflow-wrap: anywhere; }
 .separator { display: flex; align-items: center; gap: 12px; margin: 12px 0; color: var(--muted); font-size: .82rem; }
 .separator::before, .separator::after { content: ""; height: 1px; background: var(--line); flex: 1; }
 .invitation { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, .88fr); max-width: 950px; align-items: center; gap: 34px; margin: 20px auto; }
@@ -384,6 +398,10 @@ a.avatar:hover::before { background: var(--ink-hover); border-color: var(--on-in
   .form-grid { gap: 13px; }
   .access-layout { grid-template-columns: minmax(0, 1fr); padding-top: 6px; }
   .access-form { grid-area: auto; margin-top: 16px; }
+  .access-hint { margin-top: 18px; }
+  .activation-card { grid-template-columns: minmax(0, 1fr); margin: -6px 0 24px; padding: 16px; }
+  .activation-card .button { width: 100%; }
+  .activation-done { margin: -6px 0 24px; }
   .access-drawing { justify-self: center; width: min(100%, 360px); margin-top: 12px; }
   .access-copy p { margin-bottom: 0; }
   .invitation { grid-template-columns: minmax(0, 1fr); gap: 19px; margin-top: 5px; }
