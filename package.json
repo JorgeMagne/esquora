@@ -11,6 +11,7 @@
     "start": "tsx server/index.ts",
     "typecheck": "tsc --noEmit",
     "e2e": "tsx scripts/e2e.ts",
+    "evidencia": "tsx scripts/evidencia.ts",
     "test": "node --import tsx --test scripts/*.test.ts src/*.test.ts"
   },
   "dependencies": {
