@@ -32,7 +32,7 @@ Los tiempos están calculados a unas 2,4 palabras por segundo. Hay que confirmar
 
 **Lámina 4 · Solución · 22 s**
 
-> ESQUORA pone una caja fuerte en el medio. El adelanto queda guardado en Stellar, a la vista de las dos partes. Se libera cuando el vendedor, al que en la app llamamos ofertante, demuestra que cumplió y el comprador lo confirma. Y si no se cumple, vuelve al comprador.
+> ESQUORA pone una caja fuerte en el medio. El adelanto queda guardado en Stellar, a la vista de las dos partes. Se libera cuando el vendedor, al que en la demo llamamos ofertante, demuestra que cumplió y el comprador lo confirma. Y si no se cumple, vuelve al comprador.
 
 **Lámina 5 · Puente a la demo · 4 s**
 
