@@ -15,3 +15,7 @@ test-results/
 *.db-shm
 *.db-wal
 *.log
+
+# Exportaciones locales, iteraciones de marca y maquetas descartadas
+/outputs/
+/diseno/opciones/

@@ -14,3 +14,7 @@ test-results/
 *.db
 *.db-*
 *.log
+outputs/
+diseno/
+investigacion-esquora/
+*.md
