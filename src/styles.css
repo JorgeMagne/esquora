@@ -130,10 +130,11 @@ a.avatar:hover::before { background: var(--ink-hover); border-color: var(--on-in
 .empty { padding: 16px 0 30px; }
 .empty h2 { font-size: 1.32rem; }
 .empty p { color: var(--muted); margin: 9px 0 0; }
-.activation-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 14px 32px; margin: -14px 0 30px; padding: 18px 20px; background: var(--white); border: 1px solid var(--line); border-left: 3px solid var(--blue); }
+.activation-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 14px 32px; margin: -14px 0 30px; padding: 18px 20px; background: var(--blue-wash); }
 .activation-card h2 { margin: 0; font-size: 1.08rem; }
 .activation-card p { margin: 5px 0 0; color: var(--muted); max-width: 62ch; }
 .activation-card .feedback { margin-top: 12px; }
+.activation-card .feedback:not(.feedback-error) { background: var(--white); }
 .activation-card .button { flex: none; }
 .activation-done { display: flex; align-items: center; gap: 8px; margin: -14px 0 30px; padding: 12px 0; color: var(--blue-dark); font-weight: 600; border-bottom: 1px solid var(--line); }
 .activation-buyer { max-width: 1080px; margin-inline: auto; }
