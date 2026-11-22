@@ -17,6 +17,17 @@ process.env.HORIZON_URL = 'https://127.0.0.1:1'
 process.env.APP_URL = 'http://127.0.0.1:8787'
 
 const { app } = await import('../server/app.ts')
+
+test('abrir la demo no crea una sesión ni da acceso a datos y acciones privadas', async () => {
+  const me = await app.request('/api/me')
+  assert.equal(me.status, 200)
+  assert.equal((await me.json()).user, null)
+  assert.equal(me.headers.get('Set-Cookie'), null)
+  for (const path of ['/api/ops', '/api/wallet', '/api/files/ejemplo']) {
+    assert.equal((await app.request(path)).status, 401, path)
+  }
+  assert.equal((await app.request('/api/acciones', { method: 'POST' })).status, 401)
+})
 const { prepareAction, syncOperation } = await import('../server/chain.ts')
 const { db } = await import('../server/db.ts')
 const { logEvent, notifyExpiredRefunds, opById, subscribe } = await import('../server/domain.ts')

@@ -1,37 +1,17 @@
-import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { serve } from '@hono/node-server'
-import { serveStatic } from '@hono/node-server/serve-static'
 import { Hono } from 'hono'
-import { APP_URL, PORT, ROOT, TEST_AUTH_TOKEN, validateConfig } from './config.ts'
+import { PORT, ROOT, TEST_AUTH_TOKEN, validateConfig } from './config.ts'
 import { app } from './app.ts'
 import { reconcileQueue, recoverPending } from './chain.ts'
 import { notifyExpiredRefunds } from './domain.ts'
-import { mountPublicLanding } from './landing.ts'
-import { privateAccess } from './private-access.ts'
+import { mountWebPages } from './landing.ts'
 import { bootstrap } from './stellar.ts'
 
 validateConfig()
-const credentials = process.env.ESQUORA_PREVIEW_CREDENTIALS?.trim() ?? ''
 const server = new Hono()
-const dist = join(ROOT, 'dist')
-mountPublicLanding(server, dist)
-if (process.env.NODE_ENV === 'production' || credentials) {
-  server.use('*', privateAccess({ origin: APP_URL, credentials }))
-}
-server.all('*', (c) => app.fetch(c.req.raw))
-
-const entry = join(dist, 'index.html')
-if (existsSync(entry)) {
-  const index = readFileSync(entry, 'utf8')
-  app.use('/*', serveStatic({ root: dist }))
-  app.get('*', (c) => {
-    if (c.req.path.startsWith('/api/') || c.req.path.startsWith('/assets/')) return c.notFound()
-    c.header('Cache-Control', 'no-cache')
-    c.header('Referrer-Policy', 'same-origin')
-    return c.html(index)
-  })
-}
+server.route('/', app)
+mountWebPages(server, join(ROOT, 'dist'))
 
 console.log('Preparando las cuentas de ESQUORA en Stellar Testnet…')
 await bootstrap()

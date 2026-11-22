@@ -9,7 +9,7 @@ ESQUORA permite reservar una unidad inmobiliaria en preventa y condicionar el co
 
 **Entorno del prototipo:** el pago bancario en bolivianos y la conversión se simulan. El depósito en USDC de prueba, el cobro y la devolución se registran en **Stellar Testnet**. El contrato retiene el saldo. Las personas designadas revisan los documentos y el avance de obra.
 
-[Conocer ESQUORA](https://esquora-production.up.railway.app/) · [Entrar a la demo privada](https://esquora-production.up.railway.app/entrar) · [Ejecutar en local](#ejecutar-en-local) · [Comprobantes de prueba](#comprobantes-de-prueba)
+[Conocer ESQUORA](https://esquora-production.up.railway.app/) · [Entrar a la demo](https://esquora-production.up.railway.app/entrar) · [Ejecutar en local](#ejecutar-en-local) · [Comprobantes de prueba](#comprobantes-de-prueba)
 
 ## Qué se puede hacer
 
@@ -140,7 +140,6 @@ Para trabajar **solo en la página pública**, usa `npm run dev:web` y abre `/co
 | `ANCHOR_BOB_PER_USDC`, `ANCHOR_INITIAL_CENTS` | Cotización del banco simulado y reserva inicial del proveedor, en centavos de USDC de prueba. Con reserva inicial cero, el proveedor repone fondos cuando hace falta. |
 | `PLATFORM_FEE_BPS` | Comisión de ESQUORA en puntos básicos. El valor predeterminado de 90 equivale al 0,9 %. |
 | `ESQUORA_RESOLVER_EMAIL` | Habilita el mandato opcional con el correo de una cuenta de tercero activa, distinta de las partes y de la cuenta que percibe comisiones. |
-| `ESQUORA_PREVIEW_CREDENTIALS` | Control de acceso privado obligatorio en producción. Se configura únicamente en el servidor. |
 
 ## Pruebas y recorrido en Testnet
 
@@ -167,7 +166,7 @@ Cada reserva del siguiente ensayo recibió **200 USDC de prueba**. Con 0,9 % par
 
 El [Dockerfile](Dockerfile) construye ambas entradas con Vite y las sirve desde Hono. En Railway utiliza una réplica, un volumen escribible en `/app/data` y la comprobación de salud `GET /api/health`. Configura un origen HTTPS en `APP_URL` y registra ese origen y sus retornos autorizados en Pollar.
 
-Pasa `VITE_POLLAR_PUBLISHABLE_KEY` como argumento público de compilación. Las claves secretas se proporcionan al contenedor en ejecución. Para el control de acceso, genera un código privado de 32 bytes en Base64URL. Configura `ESQUORA_PREVIEW_CREDENTIALS` como el SHA-256 hexadecimal del **texto** de ese código, un separador `:` y una clave de sesión independiente de 32 bytes en hexadecimal. La sesión de acceso privado dura 12 horas y precede al inicio de sesión con Pollar. La página pública se sirve en `/` y `/conoce/`. La aplicación conserva su acceso en `/entrar` y su inicio en `/app`. [Control de acceso](server/private-access.ts) · [Rutas públicas](server/landing.ts)
+Pasa `VITE_POLLAR_PUBLISHABLE_KEY` como argumento público de compilación. Las claves secretas se proporcionan al contenedor en ejecución. La página pública se sirve en `/` y `/conoce/`. «Probar demo» abre `/entrar` directamente. Cada usuario inicia sesión con Pollar para acceder a sus operaciones en `/app`. [Sesiones y permisos](server/app.ts) · [Rutas web](server/landing.ts)
 
 Conserva el directorio de datos completo entre despliegues. Antes de migrar una base anterior, la aplicación crea una copia de SQLite en `DATA_DIR`; los adjuntos y claves de servicio requieren su propio respaldo. Si Stellar reinicia Testnet, los expedientes locales se conservan y las operaciones de prueba deben recrearse en la nueva red.
 
